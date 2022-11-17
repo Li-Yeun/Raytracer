@@ -39,6 +39,15 @@ public:
 		bottomLeft += translate;
 	}
 
+	// Angle in Radians
+	void Rotate(float3 direction, float angular_velocity)
+	{
+		mat4 rotationMatrix = mat4::Rotate(direction, angular_velocity);
+		topLeft = (float3) (rotationMatrix * (topLeft - camPos)) + camPos;
+		topRight = (float3) (rotationMatrix * (topRight - camPos)) + camPos;
+		bottomLeft = (float3) (rotationMatrix * (bottomLeft - camPos)) + camPos;
+	}
+
 	float3 Direction()
 	{
 		float u = SCRWIDTH / 2.0f * (1.0f / SCRWIDTH);
@@ -62,6 +71,18 @@ public:
 	void MoveDistal(float speed)
 	{
 		Translate(Direction() * speed);
+	}
+
+	void RotateHorizontal(float angular_velocity)
+	{
+		float3 direction = normalize(topLeft - bottomLeft);
+		Rotate(direction, angular_velocity);
+	}
+
+	void RotateVertical(float angular_velocity)
+	{
+		float3 direction = normalize(topRight - topLeft);
+		Rotate(direction, angular_velocity);
 	}
 };
 

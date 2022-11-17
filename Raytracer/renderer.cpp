@@ -26,7 +26,8 @@ float3 Renderer::Trace( Ray& ray )
 }
 
 void Renderer::KeyDown(int key) {
-	float velocity = 1;
+	float velocity = .3;
+	float angular_velocity = PI/90;
 	switch (key) {
 		case GLFW_KEY_A:
 			camera.MoveHorizontal(-velocity);
@@ -40,11 +41,23 @@ void Renderer::KeyDown(int key) {
 		case GLFW_KEY_S:
 			camera.MoveVertical(-velocity);
 			break;
-		case GLFW_KEY_UP:
+		case GLFW_KEY_E:
 			camera.MoveDistal(velocity);
+			break;
+		case GLFW_KEY_Q:
+			camera.MoveDistal(-velocity);
+			break;
+		case GLFW_KEY_UP:
+			camera.RotateVertical(angular_velocity);
 		    break;
 		case GLFW_KEY_DOWN:
-			camera.MoveDistal(-velocity);
+			camera.RotateVertical(-angular_velocity);
+			break;
+		case GLFW_KEY_LEFT:
+			camera.RotateHorizontal(angular_velocity);
+			break;
+		case GLFW_KEY_RIGHT:
+			camera.RotateHorizontal(-angular_velocity);
 			break;
 		default:
 			break;
