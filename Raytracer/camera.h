@@ -30,6 +30,39 @@ public:
 	float aspect = (float)SCRWIDTH / (float)SCRHEIGHT;
 	float3 camPos;
 	float3 topLeft, topRight, bottomLeft;
+
+	void Translate(float3 translate)
+	{
+		camPos += translate;
+		topLeft += translate;
+		topRight += translate;
+		bottomLeft += translate;
+	}
+
+	float3 Direction()
+	{
+		float u = SCRWIDTH / 2.0f * (1.0f / SCRWIDTH);
+		float v = SCRHEIGHT / 2.0f * (1.0f / SCRHEIGHT);
+		float3 C = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
+		return normalize(C - camPos);
+	}
+
+	void MoveHorizontal(float speed)
+	{
+		float3 direction = normalize(topRight - topLeft);
+		Translate(direction * speed);
+	}
+
+	void MoveVertical(float speed)
+	{
+		float3 direction = normalize(topLeft - bottomLeft);
+		Translate(direction * speed);
+	}
+
+	void MoveDistal(float speed)
+	{
+		Translate(Direction() * speed);
+	}
 };
 
 }

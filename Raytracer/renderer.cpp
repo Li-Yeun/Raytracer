@@ -25,6 +25,31 @@ float3 Renderer::Trace( Ray& ray )
 	/* visualize albedo */ // return albedo;
 }
 
+void Renderer::KeyDown(int key) {
+	float velocity = 1;
+	switch (key) {
+		case GLFW_KEY_A:
+			camera.MoveHorizontal(-velocity);
+			break;
+		case GLFW_KEY_D:
+			camera.MoveHorizontal(velocity);
+			break;
+		case GLFW_KEY_W:
+			camera.MoveVertical(velocity);
+			break;
+		case GLFW_KEY_S:
+			camera.MoveVertical(-velocity);
+			break;
+		case GLFW_KEY_UP:
+			camera.MoveDistal(velocity);
+		    break;
+		case GLFW_KEY_DOWN:
+			camera.MoveDistal(-velocity);
+			break;
+		default:
+			break;
+	}
+}
 // -----------------------------------------------------------
 // Main application tick function - Executed once per frame
 // -----------------------------------------------------------
@@ -53,5 +78,6 @@ void Renderer::Tick( float deltaTime )
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;
 	if (alpha > 0.05f) alpha *= 0.5f;
 	float fps = 1000 / avg, rps = (SCRWIDTH * SCRHEIGHT) * fps;
+	//std::cout << camera.Direction().x << ", " << camera.Direction().y << ", " << camera.Direction().z << std::endl;
 	printf( "%5.2fms (%.1fps) - %.1fMrays/s\n", avg, fps, rps / 1000000 );
 }
