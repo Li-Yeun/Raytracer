@@ -26,41 +26,78 @@ float3 Renderer::Trace( Ray& ray )
 }
 
 void Renderer::KeyDown(int key) {
-	float velocity = .3;
-	float angular_velocity = PI/90;
+	float velocity = .05f;
+	float angular_velocity = PI / 180;
 	switch (key) {
 		case GLFW_KEY_A:
-			camera.MoveHorizontal(-velocity);
+			camera.MoveHorizontal(-velocity, camera.Left);
 			break;
 		case GLFW_KEY_D:
-			camera.MoveHorizontal(velocity);
+			camera.MoveHorizontal(velocity, camera.Right);
 			break;
 		case GLFW_KEY_W:
-			camera.MoveVertical(velocity);
+			camera.MoveVertical(velocity, camera.Up);
 			break;
 		case GLFW_KEY_S:
-			camera.MoveVertical(-velocity);
+			camera.MoveVertical(-velocity, camera.Down);
 			break;
 		case GLFW_KEY_E:
-			camera.MoveDistal(velocity);
+			camera.MoveDistal(velocity, camera.In);
 			break;
 		case GLFW_KEY_Q:
-			camera.MoveDistal(-velocity);
+			camera.MoveDistal(-velocity, camera.Out);
 			break;
 		case GLFW_KEY_UP:
-			camera.RotateVertical(angular_velocity);
+			camera.RotateVertical(angular_velocity, camera.Up);
 		    break;
 		case GLFW_KEY_DOWN:
-			camera.RotateVertical(-angular_velocity);
+			camera.RotateVertical(-angular_velocity, camera.Down);
 			break;
 		case GLFW_KEY_LEFT:
-			camera.RotateHorizontal(angular_velocity);
+			camera.RotateHorizontal(angular_velocity, camera.Left);
 			break;
 		case GLFW_KEY_RIGHT:
-			camera.RotateHorizontal(-angular_velocity);
+			camera.RotateHorizontal(-angular_velocity, camera.Right);
 			break;
 		default:
 			break;
+	}
+}
+
+void Renderer::KeyUp(int key) {
+	switch (key) {
+	case GLFW_KEY_A:
+		camera.Translate(camera.Left);
+		break;
+	case GLFW_KEY_D:
+		camera.Translate(camera.Right);
+		break;
+	case GLFW_KEY_W:
+		camera.Translate(camera.Up);
+		break;
+	case GLFW_KEY_S:
+		camera.Translate(camera.Down);
+		break;
+	case GLFW_KEY_E:
+		camera.Translate(camera.In);
+		break;
+	case GLFW_KEY_Q:
+		camera.Translate(camera.Out);
+		break;
+	case GLFW_KEY_UP:
+		camera.Rotate(camera.Up);
+		break;
+	case GLFW_KEY_DOWN:
+		camera.Rotate(camera.Down);
+		break;
+	case GLFW_KEY_LEFT:
+		camera.Rotate(camera.Left);
+		break;
+	case GLFW_KEY_RIGHT:
+		camera.Rotate(camera.Right);
+		break;
+	default:
+		break;
 	}
 }
 // -----------------------------------------------------------
@@ -86,6 +123,8 @@ void Renderer::Tick( float deltaTime )
 			screen->pixels[dest + x] = 
 				RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
 	}
+
+	camera.Update();
 	// performance report - running average - ms, MRays/s
 	static float avg = 10, alpha = 1;
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;

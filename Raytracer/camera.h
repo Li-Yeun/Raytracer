@@ -11,6 +11,8 @@ namespace Tmpl8 {
 class Camera
 {
 public:
+	enum Direction { Left, Right, Up, Down, In, Out };
+
 	Camera()
 	{
 		// setup a basic view frustum
@@ -31,23 +33,32 @@ public:
 	float3 camPos;
 	float3 topLeft, topRight, bottomLeft;
 
-	void Translate(float3 translate)
+	void Translate(float3 translate, int direction)
 	{
-		camPos += translate;
-		topLeft += translate;
-		topRight += translate;
-		bottomLeft += translate;
+		translation += translate;
+		subTranslation[direction] = translate;
+	}
+
+	// Undo Translation
+	void Translate(int direction)
+	{
+		translation -= subTranslation[direction];
+		subTranslation[direction] = float3(0, 0, 0);
 	}
 
 	// Angle in Radians
-	void Rotate(float3 direction, float angular_velocity)
-	{
-		mat4 rotationMatrix = mat4::Rotate(direction, angular_velocity);
-		topLeft = (float3) (rotationMatrix * (topLeft - camPos)) + camPos;
-		topRight = (float3) (rotationMatrix * (topRight - camPos)) + camPos;
-		bottomLeft = (float3) (rotationMatrix * (bottomLeft - camPos)) + camPos;
+	void Rotate(float3 rotate, int direction)
+	{ 
+		rotation += rotate;
+		subRotation[direction] = rotate;
 	}
 
+	// Undo Rotation
+	void Rotate( int direction)
+	{
+		rotation -= subRotation[direction];
+		subRotation[direction] = float3(0, 0, 0);
+	}
 	float3 Direction()
 	{
 		float u = SCRWIDTH / 2.0f * (1.0f / SCRWIDTH);
@@ -56,34 +67,61 @@ public:
 		return normalize(C - camPos);
 	}
 
-	void MoveHorizontal(float speed)
+	void MoveHorizontal(float speed, int direction)
 	{
-		float3 direction = normalize(topRight - topLeft);
-		Translate(direction * speed);
+		float3 normDirection = normalize(topRight - topLeft);
+		Translate(normDirection * speed, direction);
 	}
 
-	void MoveVertical(float speed)
+
+	void MoveVertical(float speed, int direction)
 	{
-		float3 direction = normalize(topLeft - bottomLeft);
-		Translate(direction * speed);
+		float3 normDirection = normalize(topLeft - bottomLeft);
+		Translate(normDirection * speed, direction);
 	}
 
-	void MoveDistal(float speed)
+	void MoveDistal(float speed, int direction)
 	{
-		Translate(Direction() * speed);
+		Translate(Direction() * speed, direction);
 	}
 
-	void RotateHorizontal(float angular_velocity)
+	void RotateHorizontal(float angular_velocity, int direction)
 	{
-		float3 direction = normalize(topLeft - bottomLeft);
-		Rotate(direction, angular_velocity);
+		float3 normDirection = normalize(topLeft - bottomLeft);
+		Rotate(normDirection * angular_velocity, direction);
 	}
 
-	void RotateVertical(float angular_velocity)
+	void RotateVertical(float angular_velocity, int direction)
 	{
-		float3 direction = normalize(topRight - topLeft);
-		Rotate(direction, angular_velocity);
+		float3 normDirection = normalize(topRight - topLeft);
+		Rotate(normDirection * angular_velocity, direction);
 	}
+
+	void Update()
+	{
+		if (rotation.x + rotation.y + rotation.z != 0)
+		{
+			mat4 transformationMatrix = mat4::Rotate(normalize(rotation), magnitude(rotation));
+			topLeft = (float3)(transformationMatrix * (topLeft - camPos)) + camPos;
+			topRight = (float3)(transformationMatrix * (topRight - camPos)) + camPos;
+			bottomLeft = (float3)(transformationMatrix * (bottomLeft - camPos)) + camPos;
+		}
+
+		if (translation.x + translation.y + translation.z != 0)
+		{
+			camPos += translation;
+			topLeft += translation;
+			topRight += translation;
+			bottomLeft += translation;
+		}
+
+	}
+private:
+	float3 translation = float3(0, 0, 0);
+	float3 rotation = float3(0, 0, 0);
+
+	float3 subTranslation[6] = { float3(0,0,0) };
+	float3 subRotation[4] = { float3(0,0,0) };
 };
 
 }
