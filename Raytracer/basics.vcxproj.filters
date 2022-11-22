@@ -18,6 +18,7 @@
     <ClInclude Include="template\precomp.h">
       <Filter>template</Filter>
     </ClInclude>
+    <ClInclude Include="material.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="template">
