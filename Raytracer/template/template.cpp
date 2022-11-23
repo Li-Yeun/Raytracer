@@ -1,6 +1,10 @@
 // Template, IGAD version 3
 // IGAD/NHTV/UU - Jacco Bikker - 2006-2022
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
+#include "imgui.h"
 #include "precomp.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -32,7 +36,7 @@ static GLFWwindow* window = 0;
 static bool hasFocus = true, running = true;
 static GLTexture* renderTarget = 0;
 static int scrwidth = 0, scrheight = 0;
-static TheApp* app = 0;
+static Renderer* app = 0;
 
 // static member data for instruction set support class
 static const CPUCaps cpucaps;
@@ -264,6 +268,15 @@ void main()
 	float deltaTime = 0;
 	static int frameNr = 0;
 	static Timer timer;
+
+	// Setup ImGui
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init("#version 150");
+	ImGui::StyleColorsDark();
+
 	while (!glfwWindowShouldClose(window))
 	{
 		deltaTime = min(500.0f, 1000.0f * timer.elapsed());
@@ -277,12 +290,46 @@ void main()
 			shader->SetInputTexture(0, "c", renderTarget);
 			DrawQuad();
 			shader->Unbind();
+
+			// Feed Input to ImGui, start a new Frame.
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			ImGui::Begin("Raytracer");
+
+			// ImGui Contents
+
+			// FOV - Slider
+		    static int fov = 90;
+			if (ImGui::SliderInt("FOV", &fov, 45, 135))
+				app->camera->SetFov(fov);
+
+			// Aspect Ratio - Drop Down List
+			static const std::vector<const char*> aspect_ratio_text = { "16:10", "16:9", "5:4", "4:3", "3:2", "1:1" };
+			static const float aspect_ratio[] = { 16.0f / 10.0f, 16.0f / 9.0f, 5.0f / 4.0f, 4.0f / 3.0f, 3.0f / 2.0f, 1.0f / 1.0f };
+			static int selectedRatio = 1;
+
+			if (ImGui::Combo("Aspect Ratio", &selectedRatio, aspect_ratio_text.data(), aspect_ratio_text.size()))
+				app->camera->SetAspectRatio(aspect_ratio[selectedRatio]);
+
+			ImGui::End();
+
+			// Render ImGui to screen
+			ImGui::Render();
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+			
+
 			glfwSwapBuffers(window);
 			glfwPollEvents();
 		}
 		if (!running) break;
 	}
 	// close down
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
 	app->Shutdown();
 	Kernel::KillCL();
 	glfwDestroyWindow(window);

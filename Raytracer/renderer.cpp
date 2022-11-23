@@ -31,34 +31,34 @@ void Renderer::KeyDown(int key) {
 	float angular_velocity = PI / 180;
 	switch (key) {
 		case GLFW_KEY_A:
-			camera.MoveHorizontal(-velocity, camera.Left);
+			camera->MoveHorizontal(-velocity, camera->Left);
 			break;
 		case GLFW_KEY_D:
-			camera.MoveHorizontal(velocity, camera.Right);
+			camera->MoveHorizontal(velocity, camera->Right);
 			break;
 		case GLFW_KEY_W:
-			camera.MoveVertical(velocity, camera.Up);
+			camera->MoveVertical(velocity, camera->Up);
 			break;
 		case GLFW_KEY_S:
-			camera.MoveVertical(-velocity, camera.Down);
+			camera->MoveVertical(-velocity, camera->Down);
 			break;
 		case GLFW_KEY_E:
-			camera.MoveDistal(velocity, camera.In);
+			camera->MoveDistal(velocity, camera->In);
 			break;
 		case GLFW_KEY_Q:
-			camera.MoveDistal(-velocity, camera.Out);
+			camera->MoveDistal(-velocity, camera->Out);
 			break;
 		case GLFW_KEY_UP:
-			camera.RotateVertical(angular_velocity, camera.Up);
+			camera->RotateVertical(angular_velocity, camera->Up);
 		    break;
 		case GLFW_KEY_DOWN:
-			camera.RotateVertical(-angular_velocity, camera.Down);
+			camera->RotateVertical(-angular_velocity, camera->Down);
 			break;
 		case GLFW_KEY_LEFT:
-			camera.RotateHorizontal(angular_velocity, camera.Left);
+			camera->RotateHorizontal(angular_velocity, camera->Left);
 			break;
 		case GLFW_KEY_RIGHT:
-			camera.RotateHorizontal(-angular_velocity, camera.Right);
+			camera->RotateHorizontal(-angular_velocity, camera->Right);
 			break;
 		default:
 			break;
@@ -68,34 +68,34 @@ void Renderer::KeyDown(int key) {
 void Renderer::KeyUp(int key) {
 	switch (key) {
 	case GLFW_KEY_A:
-		camera.Translate(camera.Left);
+		camera->Translate(camera->Left);
 		break;
 	case GLFW_KEY_D:
-		camera.Translate(camera.Right);
+		camera->Translate(camera->Right);
 		break;
 	case GLFW_KEY_W:
-		camera.Translate(camera.Up);
+		camera->Translate(camera->Up);
 		break;
 	case GLFW_KEY_S:
-		camera.Translate(camera.Down);
+		camera->Translate(camera->Down);
 		break;
 	case GLFW_KEY_E:
-		camera.Translate(camera.In);
+		camera->Translate(camera->In);
 		break;
 	case GLFW_KEY_Q:
-		camera.Translate(camera.Out);
+		camera->Translate(camera->Out);
 		break;
 	case GLFW_KEY_UP:
-		camera.Rotate(camera.Up);
+		camera->Rotate(camera->Up);
 		break;
 	case GLFW_KEY_DOWN:
-		camera.Rotate(camera.Down);
+		camera->Rotate(camera->Down);
 		break;
 	case GLFW_KEY_LEFT:
-		camera.Rotate(camera.Left);
+		camera->Rotate(camera->Left);
 		break;
 	case GLFW_KEY_RIGHT:
-		camera.Rotate(camera.Right);
+		camera->Rotate(camera->Right);
 		break;
 	default:
 		break;
@@ -118,14 +118,14 @@ void Renderer::Tick( float deltaTime )
 		// trace a primary ray for each pixel on the line
 		for (int x = 0; x < SCRWIDTH; x++)
 			accumulator[x + y * SCRWIDTH] =
-				float4( Trace( camera.GetPrimaryRay( x, y ) ), 0 );
+				float4( Trace( camera->GetPrimaryRay( x, y ) ), 0 );
 		// translate accumulator contents to rgb32 pixels
 		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
 			screen->pixels[dest + x] = 
 				RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
 	}
 
-	camera.Update();
+	camera->Update();
 	// performance report - running average - ms, MRays/s
 	static float avg = 10, alpha = 1;
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;
