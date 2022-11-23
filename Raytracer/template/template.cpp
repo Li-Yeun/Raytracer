@@ -313,6 +313,14 @@ void main()
 			if (ImGui::Combo("Aspect Ratio", &selectedRatio, aspect_ratio_text.data(), aspect_ratio_text.size()))
 				app->camera->SetAspectRatio(aspect_ratio[selectedRatio]);
 
+			// Visualization Mode - Drop Down List
+			static const std::vector<const char*> visualization_mode_text = { "Albedo", "Normal", "Distance" };
+			static const Renderer::VisualizationMode visualization_mode[] = { app->Albedo, app->Normal, app->Distance };
+			static int selectedVisuals = 0;
+
+			if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))
+				app->SetVisualizationMode(visualization_mode[selectedVisuals]);
+
 			ImGui::End();
 
 			// Render ImGui to screen

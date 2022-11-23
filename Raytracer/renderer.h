@@ -6,6 +6,7 @@ namespace Tmpl8
 class Renderer : public TheApp
 {
 public:
+	enum VisualizationMode { Normal, Distance, Albedo };
 	// game flow methods
 	void Init();
 	float3 Trace( Ray& ray );
@@ -23,6 +24,10 @@ public:
 	float4* accumulator;
 	Scene scene;
 	Camera* camera = new Camera();
+
+	VisualizationMode visualizationMode = Albedo;
+	void SetVisualizationMode(VisualizationMode visual) { visualizationMode = visual; }
+
 };
 
 } // namespace Tmpl8

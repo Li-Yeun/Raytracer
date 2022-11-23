@@ -21,9 +21,17 @@ float3 Renderer::Trace( Ray& ray )
 	float3 normal = scene.GetNormal( ray.objIdx, intersection, ray.D );
 	float3 albedo = scene.GetAlbedo( ray.objIdx, intersection);
 
-	/* visualize normal */ // return (N + 1) * 0.5f;
-	/* visualize distance */ // return 0.1f * float3( ray.t, ray.t, ray.t );
-	/* visualize albedo */  return albedo * scene.DirectIllumination(intersection, normal);
+	switch (visualizationMode) {
+		case Albedo:
+			return albedo * scene.DirectIllumination(intersection, normal);
+			break;
+		case Normal:
+			return (normal + 1) * 0.5f;
+			break;
+		case Distance:
+			return 0.1f * float3(ray.t, ray.t, ray.t);
+			break;
+	}
 }
 
 void Renderer::KeyDown(int key) {
