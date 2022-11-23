@@ -132,7 +132,6 @@ public:
 	void SetAspectRatio(float aspect)
 	{
 		float3 midPoint_width = (topLeft + topRight) / 2;
-		float3 midPoint_height = (bottomLeft + topLeft) / 2;
 
 		float3 direction_width = normalize(topRight - topLeft);
 		float3 direction_height = normalize(topLeft - bottomLeft);
