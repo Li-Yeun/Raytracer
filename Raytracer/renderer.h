@@ -22,7 +22,7 @@ public:
 	int2 mousePos;
 	float4* accumulator;
 	Scene scene;
-	Camera camera;
+	Camera* camera = new Camera();
 };
 
 } // namespace Tmpl8

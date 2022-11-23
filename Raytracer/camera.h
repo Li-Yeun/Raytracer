@@ -39,6 +39,18 @@ public:
 		subTranslation[direction] = translate;
 	}
 
+	float3 Center()
+	{
+		float u = SCRWIDTH / 2.0f * (1.0f / SCRWIDTH);
+		float v = SCRHEIGHT / 2.0f * (1.0f / SCRHEIGHT);
+		return topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
+	}
+
+	float3 Direction()
+	{
+		return normalize(Center() - camPos);
+	}
+
 	// Undo Translation
 	void Translate(int direction)
 	{
@@ -58,13 +70,6 @@ public:
 	{
 		rotation -= subRotation[direction];
 		subRotation[direction] = float3(0, 0, 0);
-	}
-	float3 Direction()
-	{
-		float u = SCRWIDTH / 2.0f * (1.0f / SCRWIDTH);
-		float v = SCRHEIGHT / 2.0f * (1.0f / SCRHEIGHT);
-		float3 C = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
-		return normalize(C - camPos);
 	}
 
 	void MoveHorizontal(float speed, int direction)
@@ -116,6 +121,27 @@ public:
 		}
 
 	}
+
+	void SetFov(int fov)
+	{
+		float size = magnitude(topRight - topLeft);
+		float distance = size / (2.0f * tanf((float)fov * PI / (2.0f * 180.0f)));
+		camPos = Center() - Direction() * distance;
+	}
+
+	void SetAspectRatio(float aspect)
+	{
+		float3 midPoint_width = (topLeft + topRight) / 2;
+		float3 midPoint_height = (bottomLeft + topLeft) / 2;
+
+		float3 direction_width = normalize(topRight - topLeft);
+		float3 direction_height = normalize(topLeft - bottomLeft);
+
+		topLeft = midPoint_width - direction_width * aspect;
+		topRight = midPoint_width + direction_width * aspect;
+		bottomLeft = topLeft - direction_height * 2;
+	}
+
 private:
 	float3 translation = float3(0, 0, 0);
 	float3 rotation = float3(0, 0, 0);

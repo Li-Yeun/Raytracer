@@ -36,7 +36,7 @@ static GLFWwindow* window = 0;
 static bool hasFocus = true, running = true;
 static GLTexture* renderTarget = 0;
 static int scrwidth = 0, scrheight = 0;
-static TheApp* app = 0;
+static Renderer* app = 0;
 
 // static member data for instruction set support class
 static const CPUCaps cpucaps;
@@ -297,16 +297,28 @@ void main()
 			ImGui::NewFrame();
 
 			ImGui::Begin("Raytracer");
-			// ImGui Stuff
+
+			// ImGui Contents
+
+			// FOV - Slider
 		    static int fov = 90;
-			ImGui::SliderInt("FOV", &fov , 45, 135);
+			if (ImGui::SliderInt("FOV", &fov, 45, 135))
+				app->camera->SetFov(fov);
+
+			// Aspect Ratio - Drop Down List
+			static const std::vector<const char*> aspect_ratio_text = { "16:10", "16:9", "5:4", "4:3", "3:2", "1:1" };
+			static const float aspect_ratio[] = { 16.0f / 10.0f, 16.0f / 9.0f, 5.0f / 4.0f, 4.0f / 3.0f, 3.0f / 2.0f, 1.0f / 1.0f };
+			static int selectedRatio = 1;
+
+			if (ImGui::Combo("Aspect Ratio", &selectedRatio, aspect_ratio_text.data(), aspect_ratio_text.size()))
+				app->camera->SetAspectRatio(aspect_ratio[selectedRatio]);
+
 			ImGui::End();
 
 			// Render ImGui to screen
 			ImGui::Render();
 			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
-			//Camera::camPos
+			
 
 			glfwSwapBuffers(window);
 			glfwPollEvents();
