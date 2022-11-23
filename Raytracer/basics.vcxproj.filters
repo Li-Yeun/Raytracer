@@ -5,6 +5,24 @@
     <ClCompile Include="template\template.cpp">
       <Filter>template</Filter>
     </ClCompile>
+    <ClCompile Include="imgui\imgui.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_draw.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_glfw.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_impl_opengl3.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_tables.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_widgets.cpp">
+      <Filter>ImGui</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
@@ -23,6 +41,9 @@
   <ItemGroup>
     <Filter Include="template">
       <UniqueIdentifier>{a7d6e3cb-bfcd-438d-979f-17df241a55b4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ImGui">
+      <UniqueIdentifier>{9247ab48-38b3-4dfe-bbf4-811d6258a56b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

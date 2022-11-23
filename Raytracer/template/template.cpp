@@ -1,6 +1,10 @@
 // Template, IGAD version 3
 // IGAD/NHTV/UU - Jacco Bikker - 2006-2022
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
 
+#include "imgui.h"
 #include "precomp.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -264,6 +268,15 @@ void main()
 	float deltaTime = 0;
 	static int frameNr = 0;
 	static Timer timer;
+
+	// Setup ImGui
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init("#version 150");
+	ImGui::StyleColorsDark();
+
 	while (!glfwWindowShouldClose(window))
 	{
 		deltaTime = min(500.0f, 1000.0f * timer.elapsed());
@@ -277,12 +290,34 @@ void main()
 			shader->SetInputTexture(0, "c", renderTarget);
 			DrawQuad();
 			shader->Unbind();
+
+			// Feed Input to ImGui, start a new Frame.
+			ImGui_ImplOpenGL3_NewFrame();
+			ImGui_ImplGlfw_NewFrame();
+			ImGui::NewFrame();
+
+			ImGui::Begin("Raytracer");
+			// ImGui Stuff
+		    static int fov = 90;
+			ImGui::SliderInt("FOV", &fov , 45, 135);
+			ImGui::End();
+
+			// Render ImGui to screen
+			ImGui::Render();
+			ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+
+			//Camera::camPos
+
 			glfwSwapBuffers(window);
 			glfwPollEvents();
 		}
 		if (!running) break;
 	}
 	// close down
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
+
 	app->Shutdown();
 	Kernel::KillCL();
 	glfwDestroyWindow(window);
