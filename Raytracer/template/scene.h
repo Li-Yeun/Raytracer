@@ -411,7 +411,7 @@ public:
 		float epsilonOffset = 0.001f;
 		Ray shadowRay = Ray(intersection + shadowRayDirectionNorm * epsilonOffset, shadowRayDirectionNorm);
 		float shadowRayMagnitude = magnitude(shadowRayDirection);
-		shadowRay.t = shadowRayMagnitude - epsilonOffset;
+		shadowRay.t = shadowRayMagnitude - epsilonOffset*2 ;
 		FindNearest(shadowRay);
 		if (shadowRay.objIdx == -1)
 		{
