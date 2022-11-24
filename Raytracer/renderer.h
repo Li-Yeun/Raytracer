@@ -9,7 +9,7 @@ public:
 	enum VisualizationMode { Normal, Distance, Albedo };
 	// game flow methods
 	void Init();
-	float3 Trace( Ray& ray );
+	float3 Trace( Ray& ray, int recursion_depth);
 	void Tick( float deltaTime );
 	void Shutdown() { /* implement if you want to do something on exit */ }
 	// input handling

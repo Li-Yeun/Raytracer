@@ -1,5 +1,5 @@
 #pragma once
-
+#include "material.h"
 // -----------------------------------------------------------
 // scene.h
 // Simple test scene for ray tracing experiments. Goals:
@@ -62,8 +62,8 @@ class Sphere
 {
 public:
 	Sphere() = default;
-	Sphere( int idx, float3 p, float r ) : 
-		pos( p ), r2( r* r ), invr( 1 / r ), objIdx( idx ) {}
+	Sphere(int idx, float3 p, float r, Material mat ) :
+		pos( p ), r2( r* r ), invr( 1 / r ), objIdx( idx ), material (mat) {}
 	void Intersect( Ray& ray ) const
 	{
 		float3 oc = ray.O - this->pos;
@@ -92,9 +92,11 @@ public:
 	{
 		return float3( 0.93f );
 	}
+
 	float3 pos = 0;
 	float r2 = 0, invr = 0;
 	int objIdx = -1;
+	Material material;
 };
 
 // -----------------------------------------------------------
@@ -106,7 +108,7 @@ class Plane
 {
 public:
 	Plane() = default;
-	Plane( int idx, float3 normal, float dist ) : N( normal ), d( dist ), objIdx( idx ) {}
+	Plane( int idx, float3 normal, float dist, Material mat ) : N( normal ), d( dist ), objIdx( idx ), material( mat ) {}
 	void Intersect( Ray& ray ) const
 	{
 		float t = -(dot( ray.O, this->N ) + this->d) / (dot( ray.D, this->N ));
@@ -143,6 +145,7 @@ public:
 	float3 N;
 	float d;
 	int objIdx = -1;
+	Material material;
 };
 
 // -----------------------------------------------------------
@@ -155,11 +158,12 @@ class Cube
 {
 public:
 	Cube() = default;
-	Cube( int idx, float3 pos, float3 size, mat4 transform = mat4::Identity() )
+	Cube( int idx, float3 pos, float3 size, Material mat, mat4 transform = mat4::Identity()) : material(mat)
 	{
 		objIdx = idx;
 		b[0] = pos - 0.5f * size, b[1] = pos + 0.5f * size;
 		M = transform, invM = transform.FastInvertedTransformNoScale();
+
 	}
 	void Intersect( Ray& ray ) const
 	{
@@ -213,6 +217,7 @@ public:
 	float3 b[2];
 	mat4 M, invM;
 	int objIdx = -1;
+	Material material;
 };
 
 // -----------------------------------------------------------
@@ -223,7 +228,7 @@ class Quad
 {
 public:
 	Quad() = default;
-	Quad( int idx, float s, mat4 transform = mat4::Identity() )
+	Quad( int idx, float s, Material mat, mat4 transform = mat4::Identity()): material( mat )
 	{
 		objIdx = idx;
 		size = s * 0.5f;
@@ -253,6 +258,7 @@ public:
 	float size;
 	mat4 T, invT;
 	int objIdx = -1;
+	Material material;
 };
 
 // -----------------------------------------------------------
@@ -267,17 +273,20 @@ class Scene
 public:
 	Scene()
 	{
+		def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
+		mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
+		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.125f);
 		// we store all primitives in one continuous buffer
-		quad = Quad( 0, 1 );									// 0: light source
-		sphere = Sphere( 1, float3( 0 ), 0.5f );				// 1: bouncing ball
-		sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8 );	// 2: rounded corners
-		cube = Cube( 3, float3( 0 ), float3( 1.15f ) );			// 3: cube
-		plane[0] = Plane( 4, float3( 1, 0, 0 ), 3 );			// 4: left wall
-		plane[1] = Plane( 5, float3( -1, 0, 0 ), 2.99f );		// 5: right wall
-		plane[2] = Plane( 6, float3( 0, 1, 0 ), 1 );			// 6: floor
-		plane[3] = Plane( 7, float3( 0, -1, 0 ), 2 );			// 7: ceiling
-		plane[4] = Plane( 8, float3( 0, 0, 1 ), 3 );			// 8: front wall
-		plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f );		// 9: back wall
+		quad = Quad( 0, 1, def_mat );									// 0: light source
+		sphere = Sphere( 1, float3( 0 ), 0.5f, glass_mat);				// 1: bouncing ball
+		sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8, def_mat);	// 2: rounded corners
+		cube = Cube( 3, float3( 0 ), float3( 1.15f ), def_mat);			// 3: cube
+		plane[0] = Plane( 4, float3( 1, 0, 0 ), 3, mirror_mat);			// 4: left wall
+		plane[1] = Plane( 5, float3( -1, 0, 0 ), 2.99f, def_mat);		// 5: right wall
+		plane[2] = Plane( 6, float3( 0, 1, 0 ), 1, def_mat);			// 6: floor
+		plane[3] = Plane( 7, float3( 0, -1, 0 ), 2, def_mat);			// 7: ceiling
+		plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);			// 8: front wall
+		plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);		// 9: back wall
 		SetTime( 0 );
 		// Note: once we have triangle support we should get rid of the class
 		// hierarchy: virtuals reduce performance somewhat.
@@ -366,6 +375,18 @@ public:
 		// once we have triangle support, we should pass objIdx and the bary-
 		// centric coordinates of the hit, instead of the intersection location.
 	}
+
+	Material GetMaterial(int objIdx) const
+	{
+		if (objIdx == -1) return Material(); // or perhaps we should just crash
+		if (objIdx == 0) return quad.material;
+		if (objIdx == 1) return sphere.material;
+		if (objIdx == 2) return sphere2.material;
+		if (objIdx == 3) return cube.material;
+		return plane[objIdx - 4].material;
+		// once we have triangle support, we should pass objIdx and the bary-
+		// centric coordinates of the hit, instead of the intersection location.
+	}
 	float GetReflectivity( int objIdx, float3 I ) const
 	{
 		if (objIdx == 1 /* ball */) return 1;
@@ -409,6 +430,7 @@ public:
 	Sphere sphere2;
 	Cube cube;
 	Plane plane[6];
+	Material def_mat, mirror_mat, glass_mat;
 };
 
 }

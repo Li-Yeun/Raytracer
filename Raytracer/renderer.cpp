@@ -13,18 +13,57 @@ void Renderer::Init()
 // -----------------------------------------------------------
 // Evaluate light transport
 // -----------------------------------------------------------
-float3 Renderer::Trace( Ray& ray )
+float3 Renderer::Trace( Ray& ray, int recursion_depth)
 {
+	if (recursion_depth >= 10)
+		return float3(0);
+
 	scene.FindNearest( ray );
+
 	if (ray.objIdx == -1) return 0; // or a fancy sky color
 	float3 intersection = ray.O + ray.t * ray.D;
 	float3 normal = scene.GetNormal( ray.objIdx, intersection, ray.D );
 	float3 albedo = scene.GetAlbedo( ray.objIdx, intersection);
 
+	Material material = scene.GetMaterial(ray.objIdx);
 	switch (visualizationMode) {
 		case Albedo:
+		  if (material.type == Material::MaterialType::DIFFUSE)
+		  {
 			return albedo * scene.DirectIllumination(intersection, normal);
-			break;
+
+		  }
+		  else if (material.type == Material::MaterialType::MIRROR)
+		  {
+			float3 reflect_direction = ray.D - 2 * (dot(ray.D, normal)) * normal;
+			return material.color * Trace(Ray(intersection + reflect_direction * 0.001f, reflect_direction), recursion_depth + 1);
+		  }
+		  else if (material.type == Material::MaterialType::GLASS)
+		  {
+			  // Compute reflection
+			  float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
+			  float3 reflectionColor = albedo * Trace(Ray(intersection + reflect_direction * 0.001f, reflect_direction), recursion_depth + 1);
+
+			  // Compute refraction
+			  float n1 = 1.0003f; // refractive index of air
+			  float refraction_ratio = n1 / material.refractive_index;
+			  float incoming_angle = dot(normal, -ray.D);
+			  float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
+			  if (k < 0) return reflectionColor; 
+
+			  float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
+			  float3 refractionColor = albedo * Trace(Ray(intersection + refraction_direction * 0.001f, refraction_direction), recursion_depth + 1);
+
+			  // Compute Freshnel 
+			  float outcoming_angle = dot(-normal, refraction_direction);
+			  double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + material.refractive_index * outcoming_angle));
+			  double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + material.refractive_index * incoming_angle));
+
+			  float Fr = 0.5f * (leftFracture + rightFracture);
+
+			  return Fr * reflectionColor + (1 - Fr) * refractionColor;
+		  }
+		  break;
 		case Normal:
 			return (normal + 1) * 0.5f;
 			break;
@@ -126,7 +165,7 @@ void Renderer::Tick( float deltaTime )
 		// trace a primary ray for each pixel on the line
 		for (int x = 0; x < SCRWIDTH; x++)
 			accumulator[x + y * SCRWIDTH] =
-				float4( Trace( camera->GetPrimaryRay( x, y ) ), 0 );
+				float4( Trace( camera->GetPrimaryRay( x, y ), 0 ), 0 );
 		// translate accumulator contents to rgb32 pixels
 		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
 			screen->pixels[dest + x] = 
