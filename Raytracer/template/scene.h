@@ -398,28 +398,30 @@ public:
 		return objIdx == 3 ? 1.0f : 0.0f;
 	}
 
-	float DirectIllumination(float3 intersection, float3 normal)
+	float3 DirectIllumination(float3 intersection, float3 normal)
 	{
 		
 		// Check if ray hits other objects
 		float3 light_postion = GetLightPos();
-		float light_intensity = 10;
+		float3 light_color = float3(1.0f);
+		float light_intensity = 10.0f;
+
 		float3 shadowRayDirection = light_postion - intersection;
 		float3 shadowRayDirectionNorm = normalize(shadowRayDirection);
 		float epsilonOffset = 0.001f;
 		Ray shadowRay = Ray(intersection + shadowRayDirectionNorm * epsilonOffset, shadowRayDirectionNorm);
 		float shadowRayMagnitude = magnitude(shadowRayDirection);
-		shadowRay.t = shadowRayMagnitude - epsilonOffset * 2;
+		shadowRay.t = shadowRayMagnitude - epsilonOffset*2 ;
 		FindNearest(shadowRay);
 		if (shadowRay.objIdx == -1)
 		{
-			float distanceEnergy = 1 / (shadowRay.t * shadowRay.t);
-			float angularEnergy = dot(normal, shadowRayDirectionNorm);
-			return distanceEnergy + angularEnergy;
+			float distanceEnergy = 1 / sqrf(shadowRay.t);
+			float angularEnergy = max(dot(normal, shadowRayDirectionNorm), 0.0f);
+			return light_color * light_intensity * distanceEnergy * angularEnergy;
 		}
 		else
 		{
-			return 0;
+			return float3(0);
 		}
 	}
 
