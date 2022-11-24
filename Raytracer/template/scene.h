@@ -381,7 +381,7 @@ public:
 	{
 		
 		// Check if ray hits other objects
-		float3 light_postion = quad.T.GetTranslation();
+		float3 light_postion = GetLightPos();
 		float light_intensity = 10;
 		float3 shadowRayDirection = light_postion - intersection;
 		float3 shadowRayDirectionNorm = normalize(shadowRayDirection);
