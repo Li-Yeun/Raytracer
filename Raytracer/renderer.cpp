@@ -15,7 +15,7 @@ void Renderer::Init()
 // -----------------------------------------------------------
 float3 Renderer::Trace( Ray& ray, int recursion_depth)
 {
-	if (recursion_depth >= 10)
+	if (recursion_depth >= 10) // TODO add max_recursion_depth to UI
 		return float3(0);
 
 	scene.FindNearest( ray );
@@ -23,7 +23,7 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 	if (ray.objIdx == -1) return 0; // or a fancy sky color
 	float3 intersection = ray.O + ray.t * ray.D;
 	float3 normal = scene.GetNormal( ray.objIdx, intersection, ray.D );
-	float3 albedo = scene.GetAlbedo( ray.objIdx, intersection);
+	float3 albedo = scene.GetAlbedo( ray.objIdx, intersection); // TODO no longer needed, change to material.color (but then we need to make materials for the different objects
 
 	Material material = scene.GetMaterial(ray.objIdx);
 	switch (visualizationMode) {
