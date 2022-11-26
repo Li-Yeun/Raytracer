@@ -54,6 +54,84 @@ public:
 };
 
 // -----------------------------------------------------------
+// Triangle primitive
+// Basic triangle
+// -----------------------------------------------------------
+class Triangle
+{
+public:
+  Triangle() = default;
+  Triangle(int idx, float3 p1, float3 p2, float3 p3, Material mat) :
+	pos1(p1),
+	pos2(p2),
+	pos3(p3),
+	objIdx(idx),
+	N(GetNormal(float3(0))),
+	material(mat)
+  {
+	D = dot(N, pos1);
+  }
+
+  void Intersect(Ray& ray) const
+  {
+	// based on https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution
+
+	// No intersection if ray and plane are parallel
+	float epsilon = 0.001f;
+	if ( fabs(dot(N, ray.D)) < epsilon ) return;
+
+	float t = -(dot(ray.O, N) + D) / (dot(ray.D, N));
+	if (t < ray.t && t < 0) return; // Triangle is behind ray, so the ray should not see it.
+
+	// Compute P
+	float3 P = ray.O + t * ray.D;
+	
+	// Compute edges
+	float3 crossProduct, C;
+	// edge 1
+	float3 edge1 = pos2 - pos1;
+	C = P - pos1;
+	crossProduct = cross(edge1, C);
+	if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+	//edge 2
+	float3 edge2 = pos3 - pos2;
+	C = P - pos2;
+	crossProduct = cross(edge2, C);
+	if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+	
+	//edge 3
+	float3 edge3 = pos1 - pos3; 
+	C = P - pos3;
+	crossProduct = cross(edge3, C);
+	if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+	// If not returned by now, P is inside triangle
+	ray.t = t, ray.objIdx = objIdx;
+  }
+
+  float3 GetNormal(const float3 intersection) const
+  {
+	float3 A = pos1 - pos3;
+	float3 B = pos2 - pos3;
+	return cross(A, B);
+  }
+  float3 GetAlbedo(const float3 intersection) const
+  {
+	return float3(1);
+  }
+
+  float3 pos1 = 0;
+  float3 pos2 = 0;
+  float3 pos3 = 0;
+  int objIdx = -1;
+  float3 N;
+  float D;
+  Material material;
+  
+};
+
+// -----------------------------------------------------------
 // Sphere primitive
 // Basic sphere, with explicit support for rays that start
 // inside it. Good candidate for a dielectric material.
@@ -276,17 +354,19 @@ public:
 		def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
 		mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
 		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.125f);
+
 		// we store all primitives in one continuous buffer
-		quad = Quad( 0, 1, def_mat );									// 0: light source
-		sphere = Sphere( 1, float3( 0 ), 0.5f, glass_mat);				// 1: bouncing ball
-		sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8, def_mat);	// 2: rounded corners
-		cube = Cube( 3, float3( 0 ), float3( 1.15f ), def_mat);			// 3: cube
-		plane[0] = Plane( 4, float3( 1, 0, 0 ), 3, mirror_mat);			// 4: left wall
-		plane[1] = Plane( 5, float3( -1, 0, 0 ), 2.99f, def_mat);		// 5: right wall
-		plane[2] = Plane( 6, float3( 0, 1, 0 ), 1, def_mat);			// 6: floor
-		plane[3] = Plane( 7, float3( 0, -1, 0 ), 2, def_mat);			// 7: ceiling
-		plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);			// 8: front wall
-		plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);		// 9: back wall
+		quad = Quad( 0, 1, def_mat );																	// 0: light source
+		sphere = Sphere( 1, float3( 0 ), 0.5f, glass_mat);												// 1: bouncing ball
+		sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8, def_mat);									// 2: rounded corners
+		cube = Cube( 3, float3( 0 ), float3( 1.15f ), def_mat);											// 3: cube
+		plane[0] = Plane( 4, float3( 1, 0, 0 ), 3, mirror_mat);											// 4: left wall
+		plane[1] = Plane( 5, float3( -1, 0, 0 ), 2.99f, def_mat);										// 5: right wall
+		plane[2] = Plane( 6, float3( 0, 1, 0 ), 1, def_mat);											// 6: floor
+		plane[3] = Plane( 7, float3( 0, -1, 0 ), 2, def_mat);											// 7: ceiling
+		plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);											// 8: front wall
+		plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);										// 9: back wall
+		triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);	//10: triangle
 		SetTime( 0 );
 		// Note: once we have triangle support we should get rid of the class
 		// hierarchy: virtuals reduce performance somewhat.
@@ -330,6 +410,7 @@ public:
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
 		cube.Intersect( ray );
+		triangle.Intersect( ray );
 	}
 	bool IsOccluded( Ray& ray ) const
 	{
@@ -339,6 +420,7 @@ public:
 		sphere.Intersect( ray );
 		sphere2.Intersect( ray );
 		cube.Intersect( ray );
+		triangle.Intersect(ray);
 		return ray.t < rayLength;
 		// technically this is wasteful: 
 		// - we potentially search beyond rayLength
@@ -351,10 +433,11 @@ public:
 		// this way we prevent calculating it multiple times.
 		if (objIdx == -1) return float3( 0 ); // or perhaps we should just crash
 		float3 N;
-		if (objIdx == 0) N = quad.GetNormal( I );
-		else if (objIdx == 1) N = sphere.GetNormal( I );
-		else if (objIdx == 2) N = sphere2.GetNormal( I );
-		else if (objIdx == 3) N = cube.GetNormal( I );
+		if (objIdx == 0) N = quad.GetNormal(I);
+		else if (objIdx == 1) N = sphere.GetNormal(I);
+		else if (objIdx == 2) N = sphere2.GetNormal(I);
+		else if (objIdx == 3) N = cube.GetNormal(I);
+		else if (objIdx == 10) N = triangle.GetNormal(I);
 		else 
 		{
 			// faster to handle the 6 planes without a call to GetNormal
@@ -371,6 +454,7 @@ public:
 		if (objIdx == 1) return sphere.GetAlbedo( I );
 		if (objIdx == 2) return sphere2.GetAlbedo( I );
 		if (objIdx == 3) return cube.GetAlbedo( I );
+		if (objIdx == 10)return triangle.GetAlbedo(I);
 		return plane[objIdx - 4].GetAlbedo( I );
 		// once we have triangle support, we should pass objIdx and the bary-
 		// centric coordinates of the hit, instead of the intersection location.
@@ -383,6 +467,7 @@ public:
 		if (objIdx == 1) return sphere.material;
 		if (objIdx == 2) return sphere2.material;
 		if (objIdx == 3) return cube.material;
+		if (objIdx == 10)return triangle.material;
 		return plane[objIdx - 4].material;
 		// once we have triangle support, we should pass objIdx and the bary-
 		// centric coordinates of the hit, instead of the intersection location.
@@ -432,6 +517,7 @@ public:
 	Sphere sphere2;
 	Cube cube;
 	Plane plane[6];
+	Triangle triangle;
 	Material def_mat, mirror_mat, glass_mat;
 };
 

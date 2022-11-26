@@ -1652,5 +1652,6 @@ public:
 #include "scene.h"
 #include "camera.h"
 #include "renderer.h"
+#include "material.h"
 
 // EOF
