@@ -42,7 +42,16 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 		  {
 			  // Compute reflection
 			  float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
-			  float3 reflectionColor = albedo * Trace(Ray(intersection + reflect_direction * 0.001f, reflect_direction), recursion_depth + 1);
+			  Ray reflectRay = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+
+			  float3 absorption = float3(1.0f);
+			  if (ray.inside)
+			  {
+				  absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z* ray.t));
+				  reflectRay.inside = true;
+			  }
+
+			 float3 reflectionColor = albedo * absorption * Trace(reflectRay, recursion_depth + 1);
 
 			  // Compute refraction
 			  float n1 = 1.0003f; // refractive index of air
@@ -52,7 +61,11 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 			  if (k < 0) return reflectionColor; 
 
 			  float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
-			  float3 refractionColor = albedo * Trace(Ray(intersection + refraction_direction * 0.001f, refraction_direction), recursion_depth + 1);
+
+			  Ray refractRay = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
+			  refractRay.inside = !refractRay.inside;
+
+			  float3 refractionColor = albedo * absorption * Trace(refractRay, recursion_depth + 1);
 
 			  // Compute Freshnel 
 			  float outcoming_angle = dot(-normal, refraction_direction);

@@ -85,7 +85,7 @@ public:
 
 	// Compute P
 	float3 P = ray.O + t * ray.D;
-	
+
 	// Compute edges
 	float3 crossProduct, C;
 	// edge 1
@@ -99,9 +99,9 @@ public:
 	C = P - pos2;
 	crossProduct = cross(edge2, C);
 	if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-	
+
 	//edge 3
-	float3 edge3 = pos1 - pos3; 
+	float3 edge3 = pos1 - pos3;
 	C = P - pos3;
 	crossProduct = cross(edge3, C);
 	if (dot(N, crossProduct) <= 0) return; // P is outside triangle
@@ -128,7 +128,7 @@ public:
   float3 N;
   float D;
   Material material;
-  
+
 };
 
 // -----------------------------------------------------------
@@ -326,7 +326,7 @@ public:
 	}
 	float3 GetNormal( const float3 I ) const
 	{
-		// TransformVector( float3( 0, -1, 0 ), T ) 
+		// TransformVector( float3( 0, -1, 0 ), T )
 		return float3( -T.cell[1], -T.cell[5], -T.cell[9] );
 	}
 	float3 GetAlbedo( const float3 I ) const
@@ -353,7 +353,7 @@ public:
 	{
 		def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
 		mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
-		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.125f);
+		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.125f, float3(8.0f, 2.0f, 0.1f));
 
 		// we store all primitives in one continuous buffer
 		quad = Quad( 0, 1, def_mat );																	// 0: light source
@@ -373,7 +373,7 @@ public:
 	}
 	void SetTime( float t )
 	{
-		// default time for the scene is simply 0. Updating/ the time per frame 
+		// default time for the scene is simply 0. Updating/ the time per frame
 		// enables animation. Updating it per ray can be used for motion blur.
 		animTime = t;
 		// light source animation: swing
@@ -422,7 +422,7 @@ public:
 		cube.Intersect( ray );
 		triangle.Intersect(ray);
 		return ray.t < rayLength;
-		// technically this is wasteful: 
+		// technically this is wasteful:
 		// - we potentially search beyond rayLength
 		// - we store objIdx and t when we just need a yes/no
 		// - we don't 'early out' after the first occlusion
@@ -438,7 +438,7 @@ public:
 		else if (objIdx == 2) N = sphere2.GetNormal(I);
 		else if (objIdx == 3) N = cube.GetNormal(I);
 		else if (objIdx == 10) N = triangle.GetNormal(I);
-		else 
+		else
 		{
 			// faster to handle the 6 planes without a call to GetNormal
 			N = float3( 0 );
@@ -485,7 +485,7 @@ public:
 
 	float3 DirectIllumination(float3 intersection, float3 normal)
 	{
-		
+
 		// Check if ray hits other objects
 		float3 light_postion = GetLightPos();
 		float3 light_color = float3(1.0f);
