@@ -44,33 +44,44 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 			  float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
 			  Ray reflectRay = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
 
+			  // Compute Refraction & Absoption
+			  float air_refractive_index = 1.0003f;
+			  float n1, n2, refraction_ratio;
+
 			  float3 absorption = float3(1.0f);
 			  if (ray.inside)
 			  {
 				  absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z* ray.t));
+				  n1 = material.refractive_index;
+				  n2 = air_refractive_index;
 				  reflectRay.inside = true;
 			  }
+			  else
+			  {
+				  n1 = air_refractive_index;
+				  n2 = material.refractive_index;
+			  }
+
+			 refraction_ratio = n1 / n2;
 
 			 float3 reflectionColor = albedo * absorption * Trace(reflectRay, recursion_depth + 1);
 
-			  // Compute refraction
-			  float n1 = 1.0003f; // refractive index of air
-			  float refraction_ratio = n1 / material.refractive_index;
 			  float incoming_angle = dot(normal, -ray.D);
 			  float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
+
 			  if (k < 0) return reflectionColor; 
 
 			  float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
 
 			  Ray refractRay = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
-			  refractRay.inside = !refractRay.inside;
+			  refractRay.inside = !ray.inside;
 
 			  float3 refractionColor = albedo * absorption * Trace(refractRay, recursion_depth + 1);
 
 			  // Compute Freshnel 
 			  float outcoming_angle = dot(-normal, refraction_direction);
-			  double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + material.refractive_index * outcoming_angle));
-			  double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + material.refractive_index * incoming_angle));
+			  double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
+			  double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
 
 			  float Fr = 0.5f * (leftFracture + rightFracture);
 

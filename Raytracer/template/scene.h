@@ -353,7 +353,7 @@ public:
 	{
 		def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
 		mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
-		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.125f, float3(8.0f, 2.0f, 0.1f));
+		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52f);// float3(8.0f, 2.0f, 0.1f));
 
 		// we store all primitives in one continuous buffer
 		quad = Quad( 0, 1, def_mat );																	// 0: light source
