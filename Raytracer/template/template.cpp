@@ -286,6 +286,7 @@ void main()
 		// send the rendering result to the screen using OpenGL
 		if (frameNr++ > 1)
 		{
+			static bool anti_aliasing = false;
 			static bool vignette = false;
 			static float vignette_intensity = 1.0f;
 			static bool chroma = false;
@@ -354,6 +355,13 @@ void main()
 
 				if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))
 					app->SetVisualizationMode(visualization_mode[selectedVisuals]);
+
+				// Anti-Aliasing
+				if (ImGui::Checkbox("Anti-aliasing (4x MSAA)", &anti_aliasing))
+				{
+					app->SetAntiAliasing(anti_aliasing);
+				}
+
 			}
 			else if (tab == 1)
 			{

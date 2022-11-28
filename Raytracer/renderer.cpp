@@ -175,6 +175,7 @@ void Renderer::KeyUp(int key) {
 // -----------------------------------------------------------
 // Main application tick function - Executed once per frame
 // -----------------------------------------------------------
+
 void Renderer::Tick( float deltaTime )
 {
 	// animation
@@ -182,18 +183,47 @@ void Renderer::Tick( float deltaTime )
 	scene.SetTime( animTime += deltaTime * 0.002f );
 	// pixel loop
 	Timer t;
-	// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
-	#pragma omp parallel for schedule(dynamic)
-	for (int y = 0; y < SCRHEIGHT; y++)
+
+	if (anti_aliasing == false)
 	{
-		// trace a primary ray for each pixel on the line
-		for (int x = 0; x < SCRWIDTH; x++)
-			accumulator[x + y * SCRWIDTH] =
-				float4( Trace( camera->GetPrimaryRay( x, y ), 0 ), 0 );
-		// translate accumulator contents to rgb32 pixels
-		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-			screen->pixels[dest + x] = 
-				RGBF32_to_RGB8( &accumulator[x + y * SCRWIDTH] );
+		// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+		#pragma omp parallel for schedule(dynamic)
+		for (int y = 0; y < SCRHEIGHT; y++)
+		{
+			// trace a primary ray for each pixel on the line
+			for (int x = 0; x < SCRWIDTH; x++)
+				accumulator[x + y * SCRWIDTH] =
+				float4(Trace(camera->GetPrimaryRay(x, y), 0), 0);
+			// translate accumulator contents to rgb32 pixels
+			for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
+				screen->pixels[dest + x] =
+				RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH]);
+		}
+	}
+	else
+	{
+		// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+		#pragma omp parallel for schedule(dynamic)
+		for (int y = 0; y < SCRHEIGHT; y++)
+		{
+			// trace a primary ray for each pixel on the line
+			for (int x = 0; x < SCRWIDTH; x++)
+			{
+				accumulator[x + y * SCRWIDTH] = float4(0);
+
+				for (int sample = 0; sample < 4; ++sample)
+				{
+					float sample_x = x + samplePattern[2 * sample];
+					float sample_y = y + samplePattern[2 * sample + 1];
+					accumulator[x + y * SCRWIDTH] += float4(Trace(camera->GetPrimaryRay(sample_x, sample_y), 0), 0);
+				}
+				accumulator[x + y * SCRWIDTH] /= 4.0f;
+			}
+			// translate accumulator contents to rgb32 pixels
+			for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
+				screen->pixels[dest + x] =
+				RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH]);
+		}
 	}
 
 	camera->Update();

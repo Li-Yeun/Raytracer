@@ -21,6 +21,7 @@ public:
 		topRight = float3( aspect, 1, 0 );
 		bottomLeft = float3( -aspect, -1, 0 );
 	}
+
 	Ray GetPrimaryRay( const int x, const int y )
 	{
 		// calculate pixel position on virtual screen plane
@@ -29,6 +30,16 @@ public:
 		const float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
 		return Ray( camPos, normalize( P - camPos ));
 	}
+	// Anti-Aliasing Primary Rays
+	Ray GetPrimaryRay(const float x, const float y)
+	{
+		// calculate pixel position on virtual screen plane
+		const float u = x * (1.0f / SCRWIDTH);
+		const float v = y * (1.0f / SCRHEIGHT);
+		const float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
+		return Ray(camPos, normalize(P - camPos));
+	}
+
 	float aspect = (float)SCRWIDTH / (float)SCRHEIGHT;
 	float3 camPos;
 	float3 topLeft, topRight, bottomLeft;
