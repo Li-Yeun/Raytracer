@@ -1,4 +1,4 @@
-// Template, IGAD version 3
+﻿// Template, IGAD version 3
 // IGAD/NHTV/UU - Jacco Bikker - 2006-2022
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -277,6 +277,7 @@ void main()
 	ImGui_ImplOpenGL3_Init("#version 150");
 	ImGui::StyleColorsDark();
 
+	PostProcessing postProcessing = PostProcessing(SCRWIDTH, SCRHEIGHT, app->screen->pixels);
 	while (!glfwWindowShouldClose(window))
 	{
 		deltaTime = min(500.0f, 1000.0f * timer.elapsed());
@@ -285,7 +286,26 @@ void main()
 		// send the rendering result to the screen using OpenGL
 		if (frameNr++ > 1)
 		{
-			if (app->screen) renderTarget->CopyFrom(app->screen);
+			static bool vignette = false;
+			static float vignette_intensity = 1.0f;
+			static bool chroma = false;
+			static float chroma_intensity = 20.0f;
+			static bool gamma = false;
+			static float gamma_intensity = 1.0f;
+			if (app->screen)
+			{
+				// Post-Processing
+				if (gamma)
+					postProcessing.GammaCorrection(gamma_intensity);
+
+				if (chroma)
+					postProcessing.ChromaticAberration(chroma_intensity);
+
+				if (vignette)
+					postProcessing.Vignette(vignette_intensity);
+
+				renderTarget->CopyFrom(app->screen);
+			}	
 			shader->Bind();
 			shader->SetInputTexture(0, "c", renderTarget);
 			DrawQuad();
@@ -300,26 +320,75 @@ void main()
 
 			// ImGui Contents
 
-			// FOV - Slider
-		    static int fov = 90;
-			if (ImGui::SliderInt("FOV", &fov, 45, 135))
-				app->camera->SetFov(fov);
 
-			// Aspect Ratio - Drop Down List
-			static const std::vector<const char*> aspect_ratio_text = { "16:10", "16:9", "5:4", "4:3", "3:2", "1:1" };
-			static const float aspect_ratio[] = { 16.0f / 10.0f, 16.0f / 9.0f, 5.0f / 4.0f, 4.0f / 3.0f, 3.0f / 2.0f, 1.0f / 1.0f };
-			static int selectedRatio = 1;
+			//Creating Tabs
+			static int tab = 0;
+			if (ImGui::Button("Camera", ImVec2(50, 25)))
+				tab = 0;
+			ImGui::SameLine();
+			if (ImGui::Button("Post-Processing", ImVec2(150, 25)))
+				tab = 1;
+			ImGui::NewLine();
 
-			if (ImGui::Combo("Aspect Ratio", &selectedRatio, aspect_ratio_text.data(), aspect_ratio_text.size()))
-				app->camera->SetAspectRatio(aspect_ratio[selectedRatio]);
+			if (tab == 0)
+			{
+				// Camera - Tab
 
-			// Visualization Mode - Drop Down List
-			static const std::vector<const char*> visualization_mode_text = { "Albedo", "Normal", "Distance" };
-			static const Renderer::VisualizationMode visualization_mode[] = { app->Albedo, app->Normal, app->Distance };
-			static int selectedVisuals = 0;
+				// FOV - Slider
+				static int fov = 90;
+				if (ImGui::SliderInt("FOV", &fov, 45, 135))
+					app->camera->SetFov(fov);
 
-			if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))
-				app->SetVisualizationMode(visualization_mode[selectedVisuals]);
+				// Aspect Ratio - Drop Down List
+				static const std::vector<const char*> aspect_ratio_text = { "16:10", "16:9", "5:4", "4:3", "3:2", "1:1" };
+				static const float aspect_ratio[] = { 16.0f / 10.0f, 16.0f / 9.0f, 5.0f / 4.0f, 4.0f / 3.0f, 3.0f / 2.0f, 1.0f / 1.0f };
+				static int selectedRatio = 1;
+
+				if (ImGui::Combo("Aspect Ratio", &selectedRatio, aspect_ratio_text.data(), aspect_ratio_text.size()))
+					app->camera->SetAspectRatio(aspect_ratio[selectedRatio]);
+
+				// Visualization Mode - Drop Down List
+				static const std::vector<const char*> visualization_mode_text = { "Albedo", "Normal", "Distance" };
+				static const Renderer::VisualizationMode visualization_mode[] = { app->Albedo, app->Normal, app->Distance };
+				static int selectedVisuals = 0;
+
+				if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))
+					app->SetVisualizationMode(visualization_mode[selectedVisuals]);
+			}
+			else if (tab == 1)
+			{
+				// Post-Processing - Tab
+
+				// Vignette
+				if (ImGui::Checkbox("Vignette", &vignette))
+				{
+					if (vignette)
+						vignette_intensity = 1.0f;
+				}
+
+				if (vignette)
+					ImGui::SliderFloat("Intensity", &vignette_intensity, 0.0f, 2.0f);
+
+				// Chromatic Aberration
+				if (ImGui::Checkbox("Chromatic Aberration", &chroma))
+				{
+					if (chroma)
+						chroma_intensity = 20.0f;
+				}
+
+				if (chroma)
+					ImGui::SliderFloat("Strenght", &chroma_intensity, 0.0f, 20.0f);
+
+				// Gamma Correction
+				if (ImGui::Checkbox("Gamma Correction", &gamma))
+				{
+					if (gamma)
+						gamma_intensity = 1.0f;
+				}
+
+				if (gamma)
+					ImGui::SliderFloat("gamma-value", &gamma_intensity, 0.25f, 2.0f);
+			}
 
 			ImGui::End();
 

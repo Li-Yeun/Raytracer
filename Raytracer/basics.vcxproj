@@ -137,6 +137,7 @@
   <ItemGroup>
     <ClInclude Include="camera.h" />
     <ClInclude Include="material.h" />
+    <ClInclude Include="postprocessing.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="template\common.h" />
     <ClInclude Include="template\precomp.h" />

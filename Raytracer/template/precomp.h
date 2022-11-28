@@ -826,6 +826,7 @@ inline float2 normalize( const float2& v ) { float invLen = rsqrtf( dot( v, v ) 
 inline float3 normalize( const float3& v ) { float invLen = rsqrtf( dot( v, v ) ); return v * invLen; }
 inline float4 normalize( const float4& v ) { float invLen = rsqrtf( dot( v, v ) ); return v * invLen; }
 
+inline float magnitude(const float2& v) { float len = sqrtf(v.x * v.x + v.y * v.y); return len; }
 inline float magnitude(const float3& v) { float len = sqrtf(v.x * v.x + v.y * v.y + v.z * v.z); return len; }
 
 inline uint dominantAxis( const float2& v ) { float x = fabs( v.x ), y = fabs( v.y ); return x > y ? 0 : 1; } // for coherent grid traversal
@@ -1653,5 +1654,5 @@ public:
 #include "camera.h"
 #include "renderer.h"
 #include "material.h"
-
+#include "postprocessing.h"
 // EOF

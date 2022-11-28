@@ -366,7 +366,7 @@ public:
 		plane[3] = Plane( 7, float3( 0, -1, 0 ), 2, def_mat);											// 7: ceiling
 		plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);											// 8: front wall
 		plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);										// 9: back wall
-		triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);	//10: triangle
+		triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);			//10: triangle
 		SetTime( 0 );
 		// Note: once we have triangle support we should get rid of the class
 		// hierarchy: virtuals reduce performance somewhat.
