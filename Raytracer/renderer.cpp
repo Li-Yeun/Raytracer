@@ -10,12 +10,70 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 }
 
+/// <summary>
+/// Function that returns the pixelcolor when primary ray intersects with glass.
+/// </summary>
+/// <param name="intersection">intersection point</param>
+/// <param name="normal">normal of the intersection object</param>
+/// <param name="albedo">albedo of the intersection object</param>
+/// <param name="material">material of the intersection object</param>
+/// <param name="ray">the ray that has cast</param>
+float3 Renderer::ComputePixelColorGlass(float3 intersection, float3 normal, float3 albedo, Material& material, Ray& ray, int recursion_depth)
+{
+  // Compute reflection
+  float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
+  Ray reflectRay = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+
+  // Compute Refraction & Absoption
+  float air_refractive_index = 1.0003f;
+  float n1, n2, refraction_ratio;
+
+  float3 absorption = float3(1.0f);
+  if (ray.inside)
+  {
+	absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z * ray.t));
+	n1 = material.refractive_index;
+	n2 = air_refractive_index;
+	reflectRay.inside = true;
+  }
+  else
+  {
+	n1 = air_refractive_index;
+	n2 = material.refractive_index;
+  }
+
+  refraction_ratio = n1 / n2;
+
+  float3 reflectionColor = albedo * absorption * Trace(reflectRay, recursion_depth + 1);
+
+  float incoming_angle = dot(normal, -ray.D);
+  float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
+
+  if (k < 0) return reflectionColor;
+
+  float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
+
+  Ray refractRay = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
+  refractRay.inside = !ray.inside;
+
+  float3 refractionColor = albedo * absorption * Trace(refractRay, recursion_depth + 1);
+
+  // Compute Freshnel 
+  float outcoming_angle = dot(-normal, refraction_direction);
+  double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
+  double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
+
+  float Fr = 0.5f * (leftFracture + rightFracture);
+
+  return Fr * reflectionColor + (1 - Fr) * refractionColor;
+}
+
 // -----------------------------------------------------------
 // Evaluate light transport
 // -----------------------------------------------------------
 float3 Renderer::Trace( Ray& ray, int recursion_depth)
 {
-	if (recursion_depth >= 10) // TODO add max_recursion_depth to UI
+	if (recursion_depth >= recursionDepth)
 		return float3(0);
 
 	scene.FindNearest( ray );
@@ -27,7 +85,7 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 
 	Material material = scene.GetMaterial(ray.objIdx);
 	switch (visualizationMode) {
-		case Albedo:
+		case RayTracing:
 		  if (material.type == Material::MaterialType::DIFFUSE)
 		  {
 			return albedo * scene.DirectIllumination(intersection, normal);
@@ -40,53 +98,15 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 		  }
 		  else if (material.type == Material::MaterialType::GLASS)
 		  {
-			  // Compute reflection
-			  float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
-			  Ray reflectRay = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
-
-			  // Compute Refraction & Absoption
-			  float air_refractive_index = 1.0003f;
-			  float n1, n2, refraction_ratio;
-
-			  float3 absorption = float3(1.0f);
-			  if (ray.inside)
-			  {
-				  absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z* ray.t));
-				  n1 = material.refractive_index;
-				  n2 = air_refractive_index;
-				  reflectRay.inside = true;
-			  }
-			  else
-			  {
-				  n1 = air_refractive_index;
-				  n2 = material.refractive_index;
-			  }
-
-			 refraction_ratio = n1 / n2;
-
-			 float3 reflectionColor = albedo * absorption * Trace(reflectRay, recursion_depth + 1);
-
-			  float incoming_angle = dot(normal, -ray.D);
-			  float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
-
-			  if (k < 0) return reflectionColor; 
-
-			  float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
-
-			  Ray refractRay = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
-			  refractRay.inside = !ray.inside;
-
-			  float3 refractionColor = albedo * absorption * Trace(refractRay, recursion_depth + 1);
-
-			  // Compute Freshnel 
-			  float outcoming_angle = dot(-normal, refraction_direction);
-			  double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
-			  double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
-
-			  float Fr = 0.5f * (leftFracture + rightFracture);
-
-			  return Fr * reflectionColor + (1 - Fr) * refractionColor;
+			return ComputePixelColorGlass(intersection, normal, albedo, material, ray, recursion_depth);
 		  }
+		  break;
+		case PathTracing:
+		  return albedo;
+		  // TODO
+		  break;
+		case Albedo:
+		  return albedo;
 		  break;
 		case Normal:
 			return (normal + 1) * 0.5f;

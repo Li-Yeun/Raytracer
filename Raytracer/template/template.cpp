@@ -293,6 +293,7 @@ void main()
 			static float chroma_intensity = 20.0f;
 			static bool gamma = false;
 			static float gamma_intensity = 1.0f;
+			static int recursion_depth = 5;
 			if (app->screen)
 			{
 				// Post-Processing
@@ -340,6 +341,12 @@ void main()
 				if (ImGui::SliderInt("FOV", &fov, 45, 135))
 					app->camera->SetFov(fov);
 
+				// Recursion depth - Slider
+				if (ImGui::SliderInt("Recursion Depth", &recursion_depth, 1, 10))
+				{
+				  app->SetRecusionDepth(recursion_depth);
+				}
+
 				// Aspect Ratio - Drop Down List
 				static const std::vector<const char*> aspect_ratio_text = { "16:10", "16:9", "5:4", "4:3", "3:2", "1:1" };
 				static const float aspect_ratio[] = { 16.0f / 10.0f, 16.0f / 9.0f, 5.0f / 4.0f, 4.0f / 3.0f, 3.0f / 2.0f, 1.0f / 1.0f };
@@ -349,8 +356,8 @@ void main()
 					app->camera->SetAspectRatio(aspect_ratio[selectedRatio]);
 
 				// Visualization Mode - Drop Down List
-				static const std::vector<const char*> visualization_mode_text = { "Albedo", "Normal", "Distance" };
-				static const Renderer::VisualizationMode visualization_mode[] = { app->Albedo, app->Normal, app->Distance };
+				static const std::vector<const char*> visualization_mode_text = { "Ray Tracing", "Path Tracing", "Albedo", "Normal", "Distance"};
+				static const Renderer::VisualizationMode visualization_mode[] = { app->RayTracing, app->PathTracing, app->Albedo, app->Normal, app->Distance };
 				static int selectedVisuals = 0;
 
 				if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))

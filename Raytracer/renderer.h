@@ -6,9 +6,10 @@ namespace Tmpl8
 class Renderer : public TheApp
 {
 public:
-	enum VisualizationMode { Normal, Distance, Albedo };
+	enum VisualizationMode { Normal, Distance, Albedo, RayTracing, PathTracing };
 	// game flow methods
 	void Init();
+	float3 ComputePixelColorGlass(float3 intersection, float3 normal, float3 albedo, Material& material, Ray& ray, int recursion_depth);
 	float3 Trace( Ray& ray, int recursion_depth);
 	void Tick( float deltaTime );
 	void Shutdown() { /* implement if you want to do something on exit */ }
@@ -33,10 +34,12 @@ public:
 		 1.0f / 8.0f, -3.0f / 8.0f,
 	};
 
-	VisualizationMode visualizationMode = Albedo;
+	VisualizationMode visualizationMode = RayTracing;
+	int recursionDepth = 5;
 
 	void SetAntiAliasing(bool AA) { anti_aliasing = AA; }
 	void SetVisualizationMode(VisualizationMode visual) { visualizationMode = visual; }
+	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
 
 
 };
