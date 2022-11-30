@@ -446,6 +446,24 @@ inline uint RGBF32_to_RGB8( const float4* v )
 #endif
 }
 
+inline uint RGBF32_to_RGB8(const float4* v, int f)
+{
+#ifdef _MSC_VER_
+	// based on https://stackoverflow.com/q/29856006
+	static __m128 s4 = _mm_set1_ps(255.0f);
+	__m128 a = _mm_load_ps((const float*)v);
+	a = _mm_shuffle_ps(a, a, _MM_SHUFFLE(3, 0, 1, 2));
+	__m128i b = _mm_cvtps_epi32(_mm_mul_ps(a, s4));
+	b = _mm_packus_epi32(b, b);
+	return _mm_cvtsi128_si32(_mm_packus_epi16(b, b));
+#else
+	uint r = (uint)(255.0f * min(1.0f, v->x / f));
+	uint g = (uint)(255.0f * min(1.0f, v->y / f));
+	uint b = (uint)(255.0f * min(1.0f, v->z / f));
+	return (r << 16) + (g << 8) + b;
+#endif
+}
+
 // random numbers
 uint InitSeed( uint seedBase );
 uint RandomUInt();
@@ -1655,4 +1673,5 @@ public:
 #include "renderer.h"
 #include "material.h"
 #include "postprocessing.h"
+#include "tiny_obj_loader.h"
 // EOF

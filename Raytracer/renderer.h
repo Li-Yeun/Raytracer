@@ -36,9 +36,26 @@ public:
 
 	VisualizationMode visualizationMode = RayTracing;
 	int recursionDepth = 5;
-
+	uint accumulatedFrames = 0;
 	void SetAntiAliasing(bool AA) { anti_aliasing = AA; }
-	void SetVisualizationMode(VisualizationMode visual) { visualizationMode = visual; }
+
+	void SetVisualizationMode(VisualizationMode visual) 
+	{ 
+		visualizationMode = visual; 
+		if (visual == VisualizationMode::PathTracing)
+		{
+			accumulatedFrames = 0;
+			//Clear accumulator
+			#pragma omp parallel for schedule(dynamic)
+			for (int y = 0; y < SCRHEIGHT; y++)
+			{
+				// trace a primary ray for each pixel on the line
+				for (int x = 0; x < SCRWIDTH; x++)
+					accumulator[x + y * SCRWIDTH] =
+					float4(0);
+			}
+		}
+	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
 
 

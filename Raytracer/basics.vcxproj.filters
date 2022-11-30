@@ -23,6 +23,9 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>ImGui</Filter>
     </ClCompile>
+    <ClCompile Include="tinyobjloader\tiny_obj_loader.cc">
+      <Filter>tinyObjLoader</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.h" />
@@ -45,6 +48,9 @@
     </Filter>
     <Filter Include="ImGui">
       <UniqueIdentifier>{9247ab48-38b3-4dfe-bbf4-811d6258a56b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="tinyObjLoader">
+      <UniqueIdentifier>{24bb2d00-1738-454d-a9ca-1abe207f6d67}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

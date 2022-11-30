@@ -3,8 +3,8 @@
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
-
 #include "imgui.h"
+
 #include "precomp.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -294,6 +294,7 @@ void main()
 			static bool gamma = false;
 			static float gamma_intensity = 1.0f;
 			static int recursion_depth = 5;
+			static bool sceneIsDynamic = false;
 			if (app->screen)
 			{
 				// Post-Processing
@@ -328,21 +329,24 @@ void main()
 			if (ImGui::Button("Camera", ImVec2(50, 25)))
 				tab = 0;
 			ImGui::SameLine();
-			if (ImGui::Button("Post-Processing", ImVec2(150, 25)))
+			if (ImGui::Button("Scene", ImVec2(50, 25)))
 				tab = 1;
+			ImGui::SameLine();
+			if (ImGui::Button("Post-Processing", ImVec2(150, 25)))
+				tab = 2;
 			ImGui::NewLine();
 
 			if (tab == 0)
 			{
 				// Camera - Tab
-
+			  
 				// FOV - Slider
 				static int fov = 90;
 				if (ImGui::SliderInt("FOV", &fov, 45, 135))
 					app->camera->SetFov(fov);
 
 				// Recursion depth - Slider
-				if (ImGui::SliderInt("Recursion Depth", &recursion_depth, 1, 10))
+				if (ImGui::SliderInt("Recursion Depth", &recursion_depth, 1, 50))
 				{
 				  app->SetRecusionDepth(recursion_depth);
 				}
@@ -371,6 +375,14 @@ void main()
 
 			}
 			else if (tab == 1)
+			{
+			  // Dynamic scene
+			  if (ImGui::Checkbox("Scene is Dynamic", &sceneIsDynamic))
+			  {
+				app->scene.SetIsDynamicScene(sceneIsDynamic);
+			  }
+			}
+			else if (tab == 2)
 			{
 				// Post-Processing - Tab
 

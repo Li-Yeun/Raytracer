@@ -1,5 +1,6 @@
 #pragma once
 #include "material.h"
+#include "tiny_obj_loader.h"
 // -----------------------------------------------------------
 // scene.h
 // Simple test scene for ray tracing experiments. Goals:
@@ -351,12 +352,16 @@ class Scene
 public:
 	Scene()
 	{
+		tinyobj::ObjReader reader; // TODO
+
+
 		def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
 		mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
-		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52f);// float3(8.0f, 2.0f, 0.1f));
+		glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 0.1f));
+		light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(10.0f));
 
 		// we store all primitives in one continuous buffer
-		quad = Quad( 0, 1, def_mat );																	// 0: light source
+		quad = Quad( 0, 1, light_mat );																	// 0: light source
 		sphere = Sphere( 1, float3( 0 ), 0.5f, glass_mat);												// 1: bouncing ball
 		sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8, def_mat);									// 2: rounded corners
 		cube = Cube( 3, float3( 0 ), float3( 1.15f ), def_mat);											// 3: cube
@@ -375,7 +380,9 @@ public:
 	{
 		// default time for the scene is simply 0. Updating/ the time per frame
 		// enables animation. Updating it per ray can be used for motion blur.
-		animTime = t;
+		animTime = 0;
+
+		if (isDynamic) animTime = t;
 		// light source animation: swing
 		mat4 M1base = mat4::Translate( float3( 0, 2.6f, 2 ) );
 		mat4 M1 = M1base * mat4::RotateZ( sinf( animTime * 0.6f ) * 0.1f ) * mat4::Translate( float3( 0, -0.9, 0 ) );
@@ -387,6 +394,7 @@ public:
 		// sphere animation: bounce
 		float tm = 1 - sqrf( fmodf( animTime, 2.0f ) - 1 );
 		sphere.pos = float3( -1.4f, -0.5f + tm, 2 );
+		
 	}
 	float3 GetLightPos() const
 	{
@@ -489,7 +497,7 @@ public:
 		// Check if ray hits other objects
 		float3 light_postion = GetLightPos();
 		float3 light_color = float3(1.0f);
-		float light_intensity = 10.0f;
+		float light_intensity = 10.0f * PI;
 
 		float3 shadowRayDirection = light_postion - intersection;
 		float3 shadowRayDirectionNorm = normalize(shadowRayDirection);
@@ -510,15 +518,33 @@ public:
 		}
 	}
 
+	float3 DiffuseReflection(float3 normal)
+	{
+	  float3 randomDirection = float3(Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f);
+
+	  while (magnitude(randomDirection) > 1.0f)
+	  {
+		  randomDirection = float3(Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f);
+	  }
+
+	  randomDirection = normalize(randomDirection);
+	  if (dot(normal, randomDirection) < 0) randomDirection = -randomDirection;
+
+	  return randomDirection;
+	}
+
+	void SetIsDynamicScene(bool _isDynamic) { isDynamic = _isDynamic; }
+
 	__declspec(align(64)) // start a new cacheline here
 	float animTime = 0;
+	bool isDynamic = false;
 	Quad quad;
 	Sphere sphere;
 	Sphere sphere2;
 	Cube cube;
 	Plane plane[6];
 	Triangle triangle;
-	Material def_mat, mirror_mat, glass_mat;
+	Material def_mat, mirror_mat, glass_mat, light_mat;
 };
 
 }
