@@ -1673,5 +1673,4 @@ public:
 #include "renderer.h"
 #include "material.h"
 #include "postprocessing.h"
-#include "tiny_obj_loader.h"
 // EOF
