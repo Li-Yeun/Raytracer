@@ -24,7 +24,7 @@
       <Filter>ImGui</Filter>
     </ClCompile>
     <ClCompile Include="tinyobjloader\tiny_obj_loader.cc">
-      <Filter>tinyObjLoader</Filter>
+      <Filter>tinyobjLoader</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -49,8 +49,8 @@
     <Filter Include="ImGui">
       <UniqueIdentifier>{9247ab48-38b3-4dfe-bbf4-811d6258a56b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="tinyObjLoader">
-      <UniqueIdentifier>{24bb2d00-1738-454d-a9ca-1abe207f6d67}</UniqueIdentifier>
+    <Filter Include="tinyobjLoader">
+      <UniqueIdentifier>{e2a10a4f-3249-44cf-965c-5dd2c614542c}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>

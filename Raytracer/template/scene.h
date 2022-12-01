@@ -1,6 +1,6 @@
 #pragma once
 #include "material.h"
-#include "tiny_obj_loader.h"
+
 // -----------------------------------------------------------
 // scene.h
 // Simple test scene for ray tracing experiments. Goals:
@@ -352,7 +352,16 @@ class Scene
 public:
 	Scene()
 	{
-		tinyobj::ObjReader reader; // TODO
+		tinyobj::ObjReader objReader; // TODO
+
+		objReader.ParseFromFile("assets/pyramid.obj");
+		std::vector<tinyobj::real_t> objVertices = objReader.GetAttrib().vertices; // Get all the vertices of the object
+		std::vector<tinyobj::real_t> objTextCord = objReader.GetAttrib().texcoords; // Get all the text coord (per vertice) of the object
+
+		std::cout << objReader.GetShapes()[0].mesh.indices[0].vertex_index << std::endl; 
+		std::cout << objReader.GetShapes()[0].mesh.indices[1].vertex_index << std::endl;
+		std::cout << objReader.GetShapes()[0].mesh.indices[2].vertex_index << std::endl;
+		std::cout << objReader.GetShapes()[0].mesh.indices[3].vertex_index << std::endl;
 
 
 		def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
