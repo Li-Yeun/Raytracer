@@ -115,7 +115,7 @@ public:
   {
     float3 A = pos1 - pos3;
     float3 B = pos2 - pos3;
-    return cross(A, B);
+    return normalize(cross(A, B));
   }
   float3 GetAlbedo(const float3 intersection) const
   {
@@ -352,7 +352,6 @@ class Scene
 public:
     Scene()
     {
-        LoadObjects();
         def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
         mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
         glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 0.1f));
@@ -370,6 +369,7 @@ public:
         plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);											// 8: front wall
         plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);										// 9: back wall
         triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);			//10: triangle
+        LoadObjects();
         SetTime( 0 );
         // Note: once we have triangle support we should get rid of the class
         // hierarchy: virtuals reduce performance somewhat.
@@ -400,13 +400,20 @@ public:
         // foreach shape
         for (size_t s = 0; s < shapes.size(); s++)
         {
+            // foreach face
             for (size_t vf = 0; vf < shapes[s].mesh.indices.size(); vf++)
             {
-                const float vx = vertices[3 * size_t(shapes[s].mesh.indices[vf].vertex_index) + 0]; 
-                const float vy = vertices[3 * size_t(shapes[s].mesh.indices[vf].vertex_index) + 1]; 
-                const float vz = vertices[3 * size_t(shapes[s].mesh.indices[vf].vertex_index) + 2]; 
-
-                std::cout << vx << vy << vz << std::endl;
+                const float3 vx = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 0],
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 1],
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 2]); 
+                                                                                    
+                const float3 vy = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 0],
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 1],
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 2]); 
+                                                                                    
+                const float3 vz = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 0],
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 1],
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]); 
 
                 // create triangle
                 triangles.push_back(Triangle(10 + vf, vx, vy, vz, def_mat));
