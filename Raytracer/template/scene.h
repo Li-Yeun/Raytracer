@@ -401,7 +401,7 @@ public:
         for (size_t s = 0; s < shapes.size(); s++)
         {
             // foreach face
-            for (size_t vf = 0; vf < shapes[s].mesh.indices.size(); vf++)
+            for (size_t vf = 0; vf < shapes[s].mesh.indices.size() / 3; vf++)
             {
                 const float3 vx = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 0],
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 1],
@@ -416,7 +416,8 @@ public:
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]); 
 
                 // create triangle
-                triangles.push_back(Triangle(10 + vf, vx, vy, vz, def_mat));
+                Triangle newTriangle = Triangle(10 + vf, vx, vy, vz, def_mat);
+                triangles.push_back(newTriangle);
             }
             
         }
