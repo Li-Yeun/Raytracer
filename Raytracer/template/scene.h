@@ -367,7 +367,7 @@ public:
     {
         def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
         mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
-        glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 0.1f));
+        glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
         light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(10.0f));
 
         // we store all primitives in one continuous buffer
@@ -429,7 +429,7 @@ public:
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]); 
 
                 // create triangle
-                Triangle newTriangle = Triangle(10 + vf, vx, vy, vz, def_mat);
+                Triangle newTriangle = Triangle(11 + vf, vx, vy, vz, glass_mat);
                 triangles.push_back(newTriangle);
             }
             
