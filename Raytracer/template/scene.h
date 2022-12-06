@@ -382,14 +382,13 @@ public:
         plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);											// 8: front wall
         plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);										// 9: back wall
         //triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);			//10: triangle
-        LoadObjects();
+        LoadObject("assets/pyramid.obj", float3(0, -1, 0));
         SetTime( 0 );
         // Note: once we have triangle support we should get rid of the class
         // hierarchy: virtuals reduce performance somewhat.
     }
-    void LoadObjects()
+    void LoadObject(std::string inputfile, float3 transform = float3(0))
     {
-        std::string inputfile = "assets/pyramid.obj";
         tinyobj::ObjReaderConfig reader_config;
         reader_config.mtl_search_path = "./assets"; // Path to material files
 
@@ -429,7 +428,7 @@ public:
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]); 
 
                 // create triangle
-                Triangle newTriangle = Triangle(11 + vf, vx, vy, vz, glass_mat);
+                Triangle newTriangle = Triangle(11 + vf, vx + transform, vy + transform, vz + transform, def_mat);
                 triangles.push_back(newTriangle);
             }
             
@@ -455,16 +454,22 @@ public:
         sphere.pos = float3( -1.4f, -0.5f + tm, 2 );
         
     }
-    float3 GetLightPos() const
+    float3 * GetLightPos() const
     {
         // light point position is the middle of the swinging quad
         float3 corner1 = TransformPosition( float3( -0.5f, 0, -0.5f ), quad.T );
         float3 corner2 = TransformPosition( float3( 0.5f, 0, 0.5f ), quad.T );
-        return (corner1 + corner2) * 0.5f - float3( 0, 0.01f, 0 );
+        float3 lights[] = { (corner1 + corner2) * 0.5f - float3(0, 0.01f, 0), float3(-1, 0, 0) };
+        return lights;
     }
-    float3 GetLightColor() const
+    float3 * GetLightColor() const
     {
-        return float3( 24, 24, 22 );
+        float3 lightColors[] = { float3(24, 24, 24), float3(24, 0, 0) };
+        return lightColors;
+    }
+    int GetNLights() const
+    {
+        return 2;
     }
     void FindNearest( Ray& ray ) const
     {
@@ -566,27 +571,28 @@ public:
     {
 
         // Check if ray hits other objects
-        float3 light_postion = GetLightPos();
-        float3 light_color = float3(1.0f);
-        float light_intensity = 10.0f * PI;
+        float3 * light_postion = GetLightPos();
+        float3 * light_color = GetLightColor();
 
-        float3 shadowRayDirection = light_postion - intersection;
-        float3 shadowRayDirectionNorm = normalize(shadowRayDirection);
-        float epsilonOffset = 0.001f;
-        Ray shadowRay = Ray(intersection + shadowRayDirectionNorm * epsilonOffset, shadowRayDirectionNorm);
-        float shadowRayMagnitude = magnitude(shadowRayDirection);
-        shadowRay.t = shadowRayMagnitude - epsilonOffset*2 ;
-        FindNearest(shadowRay);
-        if (shadowRay.objIdx == -1)
+        float3 lightAccumulator = float3(0);
+
+        for (size_t i = 0; i < GetNLights(); i++)
         {
-            float distanceEnergy = 1 / sqrf(shadowRay.t);
-            float angularEnergy = max(dot(normal, shadowRayDirectionNorm), 0.0f);
-            return light_color * light_intensity * distanceEnergy * angularEnergy;
+            float3 shadowRayDirection = light_postion[i] - intersection;
+            float3 shadowRayDirectionNorm = normalize(shadowRayDirection);
+            float epsilonOffset = 0.001f;
+            Ray shadowRay = Ray(intersection + shadowRayDirectionNorm * epsilonOffset, shadowRayDirectionNorm);
+            float shadowRayMagnitude = magnitude(shadowRayDirection);
+            shadowRay.t = shadowRayMagnitude - epsilonOffset*2 ;
+            FindNearest(shadowRay);
+            if (shadowRay.objIdx == -1)
+            {
+                float distanceEnergy = 1 / sqrf(shadowRay.t);
+                float angularEnergy = max(dot(normal, shadowRayDirectionNorm), 0.0f);
+                lightAccumulator += light_color[i] * distanceEnergy * angularEnergy;
+            }
         }
-        else
-        {
-            return float3(0);
-        }
+        return lightAccumulator;
     }
 
     float3 DiffuseReflection(float3 normal)
