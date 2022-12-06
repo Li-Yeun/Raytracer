@@ -382,12 +382,12 @@ public:
         plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);											// 8: front wall
         plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);										// 9: back wall
         //triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);			//10: triangle
-        LoadObject("assets/pyramid.obj", float3(0, -1, 0));
+        LoadObject("assets/pyramid.obj", glass_mat, float3(0, 0, 1));
         SetTime( 0 );
         // Note: once we have triangle support we should get rid of the class
         // hierarchy: virtuals reduce performance somewhat.
     }
-    void LoadObject(std::string inputfile, float3 transform = float3(0))
+    void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
     {
         tinyobj::ObjReaderConfig reader_config;
         reader_config.mtl_search_path = "./assets"; // Path to material files
@@ -428,7 +428,7 @@ public:
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]); 
 
                 // create triangle
-                Triangle newTriangle = Triangle(11 + vf, vx + transform, vy + transform, vz + transform, def_mat);
+                Triangle newTriangle = Triangle(11 + vf, vx + transform, vy + transform, vz + transform, material);
                 triangles.push_back(newTriangle);
             }
             
