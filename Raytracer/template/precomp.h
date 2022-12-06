@@ -1668,8 +1668,6 @@ public:
 	Surface* screen = 0;
 };
 
-#include "tiny_obj_loader.h"
-
 #include "scene.h"
 #include "camera.h"
 #include "renderer.h"
