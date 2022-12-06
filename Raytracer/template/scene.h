@@ -87,41 +87,28 @@ public:
     // Compute P
     float3 P = ray.O + t * ray.D;
 
-    // Compute the edges and cross products
+    // Compute edges
+    float3 crossProduct, C;
+    // edge 1
     float3 edge1 = pos2 - pos1;
+    C = P - pos1;
+    crossProduct = normalize(cross(edge1, C));
+    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+    //edge 2
     float3 edge2 = pos3 - pos2;
+    C = P - pos2;
+    crossProduct = normalize(cross(edge2, C));
+    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+    //edge 3
     float3 edge3 = pos1 - pos3;
-    float3 cross1 = cross(edge1, P - pos1);
-    float3 cross2 = cross(edge2, P - pos2);
-    float3 cross3 = cross(edge3, P - pos3);
+    C = P - pos3;
+    crossProduct = normalize(cross(edge3, C));
+    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
 
-    // Check whether the intersection point is inside the triangle
-    if (dot(N, cross1) >= 0 && dot(N, cross2) >= 0 && dot(N, cross3) >= 0) {
-        ray.t = t, ray.objIdx = objIdx;
-    }
-
-    //// Compute edges
-    //float3 crossProduct, C;
-    //// edge 1
-    //float3 edge1 = pos2 - pos1;
-    //C = P - pos1;
-    //crossProduct = normalize(cross(edge1, C));
-    //if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    ////edge 2
-    //float3 edge2 = pos3 - pos2;
-    //C = P - pos2;
-    //crossProduct = normalize(cross(edge2, C));
-    //if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    ////edge 3
-    //float3 edge3 = pos1 - pos3;
-    //C = P - pos3;
-    //crossProduct = normalize(cross(edge3, C));
-    //if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    //// If not returned by now, P is inside triangle
-    //ray.t = t, ray.objIdx = objIdx;
+    // If not returned by now, P is inside triangle
+    ray.t = t, ray.objIdx = objIdx;
   }
 
   float3 GetNormal(const float3 intersection) const
@@ -367,12 +354,13 @@ public:
     {
         def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
         mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
+        absorb_all_but_blue_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 1.0f));
         glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
         light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(10.0f));
 
         // we store all primitives in one continuous buffer
         quad = Quad( 0, 1, light_mat );																	// 0: light source
-        sphere = Sphere( 1, float3( 0 ), 0.5f, def_mat);												// 1: bouncing ball
+        sphere = Sphere( 1, float3( 0 ), 0.5f, absorb_all_but_blue_mat);								// 1: bouncing ball
         sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8, def_mat);									// 2: rounded corners
         cube = Cube( 3, float3( 0 ), float3( 1.15f ), def_mat);											// 3: cube
         plane[0] = Plane( 4, float3( 1, 0, 0 ), 3, mirror_mat);											// 4: left wall
@@ -454,17 +442,16 @@ public:
         sphere.pos = float3( -1.4f, -0.5f + tm, 2 );
         
     }
-    float3 * GetLightPos() const
+    float3 * GetLightPos()
     {
         // light point position is the middle of the swinging quad
         float3 corner1 = TransformPosition( float3( -0.5f, 0, -0.5f ), quad.T );
         float3 corner2 = TransformPosition( float3( 0.5f, 0, 0.5f ), quad.T );
-        float3 lights[] = { (corner1 + corner2) * 0.5f - float3(0, 0.01f, 0), float3(-1, 0, 0) };
+        float3 lights[] = { (corner1 + corner2) * 0.5f - float3(0, 0.01f, 0), lightPos };
         return lights;
     }
-    float3 * GetLightColor() const
+    float3 * GetLightColor()
     {
-        float3 lightColors[] = { float3(24, 24, 24), float3(24, 0, 0) };
         return lightColors;
     }
     int GetNLights() const
@@ -589,7 +576,7 @@ public:
             {
                 float distanceEnergy = 1 / sqrf(shadowRay.t);
                 float angularEnergy = max(dot(normal, shadowRayDirectionNorm), 0.0f);
-                lightAccumulator += light_color[i] * distanceEnergy * angularEnergy;
+                lightAccumulator += light_color[i] * intensity * distanceEnergy * angularEnergy;
             }
         }
         return lightAccumulator;
@@ -612,6 +599,23 @@ public:
 
     void SetIsDynamicScene(bool _isDynamic) { isDynamic = _isDynamic; }
 
+    void SetLightIntensity(float newIntensity) { intensity = newIntensity; }
+
+    void SetLightPos(float3 newLightPos)
+    {
+        lightPos = newLightPos;
+    }
+
+    void SetLightColor(float3 newLightColor)
+    {
+        lightColors[1] = newLightColor;
+    }
+
+    void SetRoofLightColor(float3 newLightColor)
+    {
+        lightColors[0] = newLightColor;
+    }
+
     __declspec(align(64)) // start a new cacheline here
     float animTime = 0;
     bool isDynamic = false;
@@ -621,8 +625,11 @@ public:
     Cube cube;
     Plane plane[6];
     Triangle triangle;
+    float intensity = 24;
+    float3 lightPos = float3(-1, 0, 0);
+    float3 lightColors[2] = {float3(1, 1, 1), float3(0, 0, 0)};
     std::vector<Triangle> triangles;
-    Material def_mat, mirror_mat, glass_mat, light_mat;
+    Material def_mat, mirror_mat, glass_mat, light_mat, absorb_all_but_blue_mat;
 };
 
 }

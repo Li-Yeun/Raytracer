@@ -12,6 +12,7 @@ class Camera
 {
 public:
 	enum Direction { Left, Right, Up, Down, In, Out };
+	float angular_velocity = PI / 180;
 
 	Camera()
 	{
@@ -69,26 +70,11 @@ public:
 		subTranslation[direction] = float3(0, 0, 0);
 	}
 
-	// Angle in Radians
-	void Rotate(float3 rotate, int direction)
-	{ 
-		rotation += rotate;
-		subRotation[direction] = rotate;
-	}
-
-	// Undo Rotation
-	void Rotate( int direction)
-	{
-		rotation -= subRotation[direction];
-		subRotation[direction] = float3(0, 0, 0);
-	}
-
 	void MoveHorizontal(float speed, int direction)
 	{
 		float3 normDirection = normalize(topRight - topLeft);
 		Translate(normDirection * speed, direction);
 	}
-
 
 	void MoveVertical(float speed, int direction)
 	{
@@ -101,21 +87,22 @@ public:
 		Translate(Direction() * speed, direction);
 	}
 
-	void RotateHorizontal(float angular_velocity, int direction)
-	{
-		float3 normDirection = normalize(topLeft - bottomLeft);
-		Rotate(normDirection * angular_velocity, direction);
-	}
-
-	void RotateVertical(float angular_velocity, int direction)
-	{
-		float3 normDirection = normalize(topRight - topLeft);
-		Rotate(normDirection * angular_velocity, direction);
-	}
 
 	void Update()
 	{
-		if (rotation.x + rotation.y + rotation.z != 0)
+		float3 rotation = float3(0);
+		float3 horizontalDirection = normalize(topLeft - bottomLeft);
+		float3 verticalDirection = normalize(topRight - topLeft);
+		if (rotateDirections[0])
+			rotation += horizontalDirection * angular_velocity;
+		else if (rotateDirections[1])
+			rotation -= horizontalDirection * angular_velocity;
+		else if (rotateDirections[2])
+			rotation += verticalDirection * angular_velocity;
+		else if (rotateDirections[3])
+			rotation -= verticalDirection * angular_velocity;
+
+		if (rotateDirections[0] || rotateDirections[1] || rotateDirections[2] || rotateDirections[3])
 		{
 			mat4 transformationMatrix = mat4::Rotate(normalize(rotation), magnitude(rotation));
 			topLeft = (float3)(transformationMatrix * (topLeft - camPos)) + camPos;
@@ -152,12 +139,12 @@ public:
 		bottomLeft = topLeft - direction_height * 2;
 	}
 
+	bool rotateDirections[4] = { false };
+
 private:
 	float3 translation = float3(0, 0, 0);
-	float3 rotation = float3(0, 0, 0);
 
 	float3 subTranslation[6] = { float3(0,0,0) };
-	float3 subRotation[4] = { float3(0,0,0) };
 };
 
 }

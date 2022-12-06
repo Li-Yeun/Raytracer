@@ -286,6 +286,7 @@ void main()
 		// send the rendering result to the screen using OpenGL
 		if (frameNr++ > 1)
 		{
+			static int selectedVisuals = 0;
 			static bool anti_aliasing = false;
 			static bool vignette = false;
 			static float vignette_intensity = 1.0f;
@@ -295,6 +296,10 @@ void main()
 			static float gamma_intensity = 1.0f;
 			static int recursion_depth = 5;
 			static bool sceneIsDynamic = false;
+			static float lightIntensity = 24;
+			static float lightPosition[3] = { -1, 0, 0 } ;
+			static float roofLightColor[3] = { 1, 1, 1 };
+			static float lightColor[3] = { 0, 0, 0 };
 			if (app->screen)
 			{
 				// Post-Processing
@@ -362,7 +367,6 @@ void main()
 				// Visualization Mode - Drop Down List
 				static const std::vector<const char*> visualization_mode_text = { "Ray Tracing", "Path Tracing", "Albedo", "Normal", "Distance"};
 				static const Renderer::VisualizationMode visualization_mode[] = { app->RayTracing, app->PathTracing, app->Albedo, app->Normal, app->Distance };
-				static int selectedVisuals = 0;
 
 				if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))
 					app->SetVisualizationMode(visualization_mode[selectedVisuals]);
@@ -380,6 +384,26 @@ void main()
 			  if (ImGui::Checkbox("Scene is Dynamic", &sceneIsDynamic))
 			  {
 				app->scene.SetIsDynamicScene(sceneIsDynamic);
+			  }
+			  if (selectedVisuals == 0)
+			  {
+				  // Light colors
+				  if (ImGui::ColorEdit3("Color roof light", roofLightColor))
+				  {
+					  app->scene.SetRoofLightColor(float3(roofLightColor[0], roofLightColor[1], roofLightColor[2]));
+				  }
+				  if (ImGui::ColorEdit3("Color light", lightColor))
+				  {
+					  app->scene.SetLightColor(float3(lightColor[0], lightColor[1], lightColor[2]));
+				  }
+				  if (ImGui::SliderFloat("Light intensity", &lightIntensity, 0, 50))
+				  {
+					  app->scene.SetLightIntensity(lightIntensity);
+				  }
+				  if (ImGui::DragFloat3("Light position", lightPosition, 0.05f, -5, 5))
+				  {
+					  app->scene.SetLightPos(float3(lightPosition[0], lightPosition[1], lightPosition[2]));
+				  }
 			  }
 			}
 			else if (tab == 2)

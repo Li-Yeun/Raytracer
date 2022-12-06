@@ -185,7 +185,6 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 
 void Renderer::KeyDown(int key) {
 	float velocity = .05f;
-	float angular_velocity = PI / 180;
 	switch (key) {
 		case GLFW_KEY_A:
 			camera->MoveHorizontal(-velocity, camera->Left);
@@ -206,16 +205,16 @@ void Renderer::KeyDown(int key) {
 			camera->MoveDistal(-velocity, camera->Out);
 			break;
 		case GLFW_KEY_UP:
-			camera->RotateVertical(angular_velocity, camera->Up);
+			camera->rotateDirections[2] = true;
 		    break;
 		case GLFW_KEY_DOWN:
-			camera->RotateVertical(-angular_velocity, camera->Down);
+			camera->rotateDirections[3] = true;
 			break;
 		case GLFW_KEY_LEFT:
-			camera->RotateHorizontal(angular_velocity, camera->Left);
+			camera->rotateDirections[0] = true;
 			break;
 		case GLFW_KEY_RIGHT:
-			camera->RotateHorizontal(-angular_velocity, camera->Right);
+			camera->rotateDirections[1] = true;
 			break;
 		default:
 			break;
@@ -243,16 +242,16 @@ void Renderer::KeyUp(int key) {
 		camera->Translate(camera->Out);
 		break;
 	case GLFW_KEY_UP:
-		camera->Rotate(camera->Up);
+		camera->rotateDirections[2] = false;
 		break;
 	case GLFW_KEY_DOWN:
-		camera->Rotate(camera->Down);
+		camera->rotateDirections[3] = false;
 		break;
 	case GLFW_KEY_LEFT:
-		camera->Rotate(camera->Left);
+		camera->rotateDirections[0] = false;
 		break;
 	case GLFW_KEY_RIGHT:
-		camera->Rotate(camera->Right);
+		camera->rotateDirections[1] = false;
 		break;
 	default:
 		break;
