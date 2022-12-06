@@ -70,7 +70,7 @@ public:
     N(GetNormal(float3(0))),
     material(mat)
   {
-    D = dot(N, pos1);
+    D = -dot(N, pos1);
   }
 
   void Intersect(Ray& ray) const
@@ -82,39 +82,52 @@ public:
     if ( fabs(dot(N, ray.D)) < epsilon ) return;
 
     float t = -(dot(ray.O, N) + D) / (dot(ray.D, N));
-    if (t < ray.t && t < 0) return; // Triangle is behind ray, so the ray should not see it.
+    if (t >= ray.t || t <= 0) return; // Triangle is behind ray, so the ray should not see it.
 
     // Compute P
     float3 P = ray.O + t * ray.D;
 
-    // Compute edges
-    float3 crossProduct, C;
-    // edge 1
+    // Compute the edges and cross products
     float3 edge1 = pos2 - pos1;
-    C = P - pos1;
-    crossProduct = cross(edge1, C);
-    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    //edge 2
     float3 edge2 = pos3 - pos2;
-    C = P - pos2;
-    crossProduct = cross(edge2, C);
-    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    //edge 3
     float3 edge3 = pos1 - pos3;
-    C = P - pos3;
-    crossProduct = cross(edge3, C);
-    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+    float3 cross1 = cross(edge1, P - pos1);
+    float3 cross2 = cross(edge2, P - pos2);
+    float3 cross3 = cross(edge3, P - pos3);
 
-    // If not returned by now, P is inside triangle
-    ray.t = t, ray.objIdx = objIdx;
+    // Check whether the intersection point is inside the triangle
+    if (dot(N, cross1) >= 0 && dot(N, cross2) >= 0 && dot(N, cross3) >= 0) {
+        ray.t = t, ray.objIdx = objIdx;
+    }
+
+    //// Compute edges
+    //float3 crossProduct, C;
+    //// edge 1
+    //float3 edge1 = pos2 - pos1;
+    //C = P - pos1;
+    //crossProduct = normalize(cross(edge1, C));
+    //if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+    ////edge 2
+    //float3 edge2 = pos3 - pos2;
+    //C = P - pos2;
+    //crossProduct = normalize(cross(edge2, C));
+    //if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+    ////edge 3
+    //float3 edge3 = pos1 - pos3;
+    //C = P - pos3;
+    //crossProduct = normalize(cross(edge3, C));
+    //if (dot(N, crossProduct) <= 0) return; // P is outside triangle
+
+    //// If not returned by now, P is inside triangle
+    //ray.t = t, ray.objIdx = objIdx;
   }
 
   float3 GetNormal(const float3 intersection) const
   {
-    float3 A = pos1 - pos3;
-    float3 B = pos2 - pos3;
+    float3 A = pos2 - pos1;
+    float3 B = pos3 - pos1;
     return normalize(cross(A, B));
   }
   float3 GetAlbedo(const float3 intersection) const
@@ -359,7 +372,7 @@ public:
 
         // we store all primitives in one continuous buffer
         quad = Quad( 0, 1, light_mat );																	// 0: light source
-        sphere = Sphere( 1, float3( 0 ), 0.5f, glass_mat);												// 1: bouncing ball
+        sphere = Sphere( 1, float3( 0 ), 0.5f, def_mat);												// 1: bouncing ball
         sphere2 = Sphere( 2, float3( 0, 2.5f, -3.07f ), 8, def_mat);									// 2: rounded corners
         cube = Cube( 3, float3( 0 ), float3( 1.15f ), def_mat);											// 3: cube
         plane[0] = Plane( 4, float3( 1, 0, 0 ), 3, mirror_mat);											// 4: left wall
@@ -368,7 +381,7 @@ public:
         plane[3] = Plane( 7, float3( 0, -1, 0 ), 2, def_mat);											// 7: ceiling
         plane[4] = Plane( 8, float3( 0, 0, 1 ), 3, def_mat);											// 8: front wall
         plane[5] = Plane( 9, float3( 0, 0, -1 ), 3.99f, def_mat);										// 9: back wall
-        triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);			//10: triangle
+        //triangle = Triangle(10, float3(1, 0, 1), float3(0, 1, -1), float3(0, 0, 1), def_mat);			//10: triangle
         LoadObjects();
         SetTime( 0 );
         // Note: once we have triangle support we should get rid of the class
