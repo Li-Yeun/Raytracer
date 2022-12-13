@@ -78,37 +78,23 @@ public:
     // based on https://www.scratchapixel.com/lessons/3d-basic-rendering/ray-tracing-rendering-a-triangle/ray-triangle-intersection-geometric-solution
 
     // No intersection if ray and plane are parallel
-    float epsilon = 0.001f;
-    if ( fabs(dot(N, ray.D)) < epsilon ) return;
-
-    float t = -(dot(ray.O, N) + D) / (dot(ray.D, N));
-    if (t >= ray.t || t <= 0) return; // Triangle is behind ray, so the ray should not see it.
-
-    // Compute P
-    float3 P = ray.O + t * ray.D;
-
-    // Compute edges
-    float3 crossProduct, C;
-    // edge 1
-    float3 edge1 = pos2 - pos1;
-    C = P - pos1;
-    crossProduct = normalize(cross(edge1, C));
-    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    //edge 2
-    float3 edge2 = pos3 - pos2;
-    C = P - pos2;
-    crossProduct = normalize(cross(edge2, C));
-    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    //edge 3
-    float3 edge3 = pos1 - pos3;
-    C = P - pos3;
-    crossProduct = normalize(cross(edge3, C));
-    if (dot(N, crossProduct) <= 0) return; // P is outside triangle
-
-    // If not returned by now, P is inside triangle
-    ray.t = t, ray.objIdx = objIdx;
+      const float3 edge1 = pos2 - pos1;
+      const float3 edge2 = pos3 - pos1;
+      const float3 h = cross(ray.D, edge2);
+      const float a = dot(edge1, h);
+      if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
+      const float f = 1 / a;
+      const float3 s = ray.O - pos1;
+      const float u = f * dot(s, h);
+      if (u < 0 || u > 1) return;
+      const float3 q = cross(s, edge1);
+      const float v = f * dot(ray.D, q);
+      if (v < 0 || u + v > 1) return;
+      const float t = f * dot(edge2, q);
+      if (t > 0.0001f && t < ray.t) {
+          ray.t = t;
+          ray.objIdx = objIdx;
+      }
   }
 
   float3 GetNormal(const float3 intersection) const
