@@ -136,9 +136,11 @@
     <ClCompile Include="tinyobjloader\tiny_obj_loader.cc" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="bvh.h" />
     <ClInclude Include="camera.h" />
     <ClInclude Include="material.h" />
     <ClInclude Include="postprocessing.h" />
+    <ClInclude Include="primitive.h" />
     <ClInclude Include="renderer.h" />
     <ClInclude Include="template\common.h" />
     <ClInclude Include="template\precomp.h" />
