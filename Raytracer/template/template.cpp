@@ -300,6 +300,8 @@ void main()
 			static float lightPosition[3] = { -1, 0, 0 } ;
 			static float roofLightColor[3] = { 1, 1, 1 };
 			static float lightColor[3] = { 0, 0, 0 };
+
+			static bool useQBVH = true;
 			if (app->screen)
 			{
 				// Post-Processing
@@ -339,6 +341,8 @@ void main()
 			ImGui::SameLine();
 			if (ImGui::Button("Post-Processing", ImVec2(150, 25)))
 				tab = 2;
+			if (ImGui::Button("BVH", ImVec2(50, 25)))
+				tab = 3;
 			ImGui::NewLine();
 
 			if (tab == 0)
@@ -439,6 +443,14 @@ void main()
 
 				if (gamma)
 					ImGui::SliderFloat("gamma-value", &gamma_intensity, 0.25f, 2.0f);
+			}
+			else if (tab == 3)
+			{
+				// Post-BVH - Tab
+				if (ImGui::Checkbox("Use QBVH", &useQBVH))
+				{
+					app->scene.SetQBVH(useQBVH);
+				}
 			}
 
 			ImGui::End();

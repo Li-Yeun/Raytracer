@@ -48,16 +48,16 @@ public:
 
         quads_size = 1;
         quads = new Quad[quads_size] { Quad(id++, 1, light_mat) };                              // 0: light source
-                  
+
         spheres_size = 2;
-        spheres = new Sphere[spheres_size]{ 
+        spheres = new Sphere[spheres_size]{
             Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, absorb_all_but_blue_mat),                             // 1: bouncing ball
-            Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners		
+            Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners
 
         cubes_size = 1;
         cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(1.15f), def_mat) };         // 3: cube
-               
-        planes_size = 6;                                                                                                
+
+        planes_size = 6;
         planes = new Plane[planes_size]{
             Plane(id++, float3(1, 0, 0), 3, mirror_mat),                                        // 4: left wall
             Plane(id++, float3(-1, 0, 0), 2.99f, def_mat),										// 5: right wall
@@ -108,21 +108,21 @@ public:
             {
                 const float3 vx = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 0],
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 1],
-                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 2]); 
-                                                                                    
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf].vertex_index) + 2]);
+
                 const float3 vy = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 0],
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 1],
-                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 2]); 
-                                                                                    
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+1].vertex_index) + 2]);
+
                 const float3 vz = float3(vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 0],
                                          vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 1],
-                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]); 
+                                         vertices[3 * size_t(shapes[s].mesh.indices[3*vf+2].vertex_index) + 2]);
 
                 // create triangle
                 Triangle newTriangle = Triangle(id + vf, vx + transform, vy + transform, vz + transform, material);
                 newTriangles[vf] = newTriangle;
             }
-            
+
             id += size;
 
             if (triangles_size == 0)
@@ -150,7 +150,7 @@ public:
         // enables animation. Updating it per ray can be used for motion blur.
         animTime = 0;
 
-        
+
 
         if (isDynamic) animTime = t;
         // light source animation: swing
@@ -164,7 +164,7 @@ public:
         // sphere animation: bounce
         float tm = 1 - sqrf( fmodf( animTime, 2.0f ) - 1 );
         //spheres[0].pos = float3( -1.4f, -0.5f + tm, 2 );
-        
+
     }
     float3 * GetLightPos()
     {
@@ -186,21 +186,22 @@ public:
     {
         quads[0].Intersect( ray );
         cubes[0].Intersect( ray );
-        bvh->IntersectQBVH( ray );
 
-
+        if(useQBVH)
+            bvh->IntersectQBVH( ray );
+        else
+            bvh->IntersectBVH(ray);
     }
     bool IsOccluded( Ray& ray) const
     {
-        float rayLength = ray.t;
-        // skip planes: it is not possible for the walls to occlude anything
         quads[0].Intersect(ray);
-        cubes[0].Intersect(ray);;
-        return bvh->IntersectQBVHShadowRay(ray, ray.objIdx != -1);
-        // technically this is wasteful:
-        // - we potentially search beyond rayLength
-        // - we store objIdx and t when we just need a yes/no
-        // - we don't 'early out' after the first occlusion
+        cubes[0].Intersect(ray);
+
+        if(useQBVH)
+            return bvh->IntersectQBVHShadowRay(ray, ray.objIdx != -1);
+        else
+            return bvh->IntersectBVHShadowRay(ray, ray.objIdx != -1);
+
     }
     float3 GetNormal( int objIdx, float3 I, float3 wo ) const
     {
@@ -373,6 +374,11 @@ public:
         lightColors[0] = newLightColor;
     }
 
+    void SetQBVH(bool mode)
+    {
+        useQBVH = mode;
+    }
+
     __declspec(align(64)) // start a new cacheline here
     float animTime = 0;
     bool isDynamic = false;
@@ -398,6 +404,9 @@ public:
     Material def_mat, mirror_mat, glass_mat, light_mat, absorb_all_but_blue_mat;
     BVH* bvh = 0;
     int id = 0;
+
+    // QBVH
+    bool useQBVH = true;
 };
 
 }

@@ -19,6 +19,17 @@ __declspec(align(64)) struct SIMD_BVH_Node
 	int child[4], count[4];
 };
 
+struct aabbSAH
+{
+	float3 bmin = 1e30f, bmax = -1e30f;
+	void grow(float3 p) { bmin = fminf(bmin, p), bmax = fmaxf(bmax, p); }
+	float area()
+	{
+		float3 e = bmax - bmin; // box extent
+		return e.x * e.y + e.y * e.z + e.z * e.x;
+	}
+};
+
 class BVH
 {
 public:
@@ -32,7 +43,7 @@ public:
     Triangle* triangles = 0;
 
     int* primitiveIdx = 0;
-	
+
     BVHNode* bvhNode = 0;
     uint rootNodeIdx = 0, planeRootNodeIdx = 1, primitveRootNodeIdx = 2, nodesUsed = 3;
 
@@ -74,7 +85,8 @@ public:
 						float areaY = fabs(parentNode.bmaxy[j] - parentNode.bminy[j]);
 						float areaZ = fabs(parentNode.bmaxz[j] - parentNode.bminz[j]);
 
-						float area = areaX * areaY * areaZ;
+						float area = areaX * areaY + areaY * areaZ + areaZ * areaX;
+
 						if (area > greatest_area)
 						{
 							greatest_area = area;
@@ -88,10 +100,10 @@ public:
 
 				int left_child = parentNode.child[greatest_child];
 				int right_child = parentNode.child[greatest_child] + 1;
-				
+
 
 				// Left Child
-					
+
 				parentNode.count[greatest_child] = bvhNode[left_child].primitiveCount;
 				parentNode.child[greatest_child] = bvhNode[left_child].leftFirst;
 
@@ -105,7 +117,7 @@ public:
 				// Right Child
 				parentNode.count[i] = bvhNode[right_child].primitiveCount;
 				parentNode.child[i] = bvhNode[right_child].leftFirst;
-					
+
 				/*
 				std::cout << "greatest_child: " << greatest_child << std::endl;
 				std::cout << "left_child: " << left_child << std::endl;
@@ -129,7 +141,7 @@ public:
 				{
 					//std::cout << parentNode.child[k] << std::endl;
 				}
-				
+
 
 			}
 		}
@@ -285,13 +297,40 @@ public:
 	{
 		// terminate recursion
 		BVHNode& node = bvhNode[nodeIdx];
+
+		float3 e = node.aabbMax - node.aabbMin; // extent of parent
+		float parentArea = e.x * e.y + e.y * e.z + e.z * e.x;
+		float parentCost = node.primitiveCount * parentArea;
+
 		if (node.primitiveCount <= 2) return;
-		// determine split axis and position
+		// determine split axis using SAH
+		int bestAxis = -1;
+		float bestPos = 0, bestCost = 1e30f;
+		for (int axis = 0; axis < 3; axis++) for (uint i = 0; i < node.primitiveCount; i++)
+		{
+			float candidatePos;
+			if (primitiveIdx[node.leftFirst + i] < spheres_size)
+				candidatePos = spheres[primitiveIdx[node.leftFirst + i]].pos[axis];
+			else
+				candidatePos = triangles[primitiveIdx[node.leftFirst + i] - spheres_size].centroid[axis];
+
+			float cost = EvaluateSAH(node, axis, candidatePos);
+			if (cost < bestCost)
+				bestPos = candidatePos, bestAxis = axis, bestCost = cost;
+		}
+
+		if (bestCost >= parentCost) return;
+
+		int axis = bestAxis;
+		float splitPos = bestPos;
+
+		/*
 		float3 extent = node.aabbMax - node.aabbMin;
 		int axis = 0;
 		if (extent.y > extent.x) axis = 1;
 		if (extent.z > extent[axis]) axis = 2;
 		float splitPos = node.aabbMin[axis] + extent[axis] * 0.5f;
+		*/
 		// in-place partition
 		int i = node.leftFirst;
 		int j = i + node.primitiveCount - 1;
@@ -331,54 +370,103 @@ public:
 		Subdivide(rightChildIdx);
 	}
 
+	float EvaluateSAH(BVHNode& node, int axis, float pos)
+	{
+		// determine triangle counts and bounds for this split candidate
+		aabbSAH leftBox, rightBox;
+		int leftCount = 0, rightCount = 0;
+		for (uint i = 0; i < node.primitiveCount; i++)
+		{
+			if (primitiveIdx[node.leftFirst + i] < spheres_size)
+			{
+				Sphere& sphere = spheres[primitiveIdx[node.leftFirst + i]];
+				if (sphere.pos[axis] < pos)
+				{
+					leftCount++;
+					leftBox.grow(sphere.pos - sphere.r);
+					leftBox.grow(sphere.pos + sphere.r);
+				}
+				else
+				{
+					rightCount++;
+					rightBox.grow(sphere.pos - sphere.r);
+					rightBox.grow(sphere.pos + sphere.r);
+				}
+			}
+			else
+			{
+				Triangle& triangle = triangles[primitiveIdx[node.leftFirst + i] - spheres_size];
+				if (triangle.centroid[axis] < pos)
+				{
+					leftCount++;
+					leftBox.grow(triangle.pos1);
+					leftBox.grow(triangle.pos2);
+					leftBox.grow(triangle.pos3);
+				}
+				else
+				{
+					rightCount++;
+					rightBox.grow(triangle.pos1);
+					rightBox.grow(triangle.pos2);
+					rightBox.grow(triangle.pos3);
+				}
+			}
+
+
+		}
+		float cost = leftCount * leftBox.area() + rightCount * rightBox.area();
+		return cost > 0 ? cost : 1e30f;
+	}
+
 	bool IntersectAABB(const Ray& ray, const float3 bmin, const float3 bmax)
 	{
-		float tx1 = (bmin.x - ray.O.x) / ray.D.x, tx2 = (bmax.x - ray.O.x) / ray.D.x;
+		float tx1 = (bmin.x - ray.O.x) * ray.rD.x, tx2 = (bmax.x - ray.O.x) * ray.rD.x;
 		float tmin = min(tx1, tx2), tmax = max(tx1, tx2);
-		float ty1 = (bmin.y - ray.O.y) / ray.D.y, ty2 = (bmax.y - ray.O.y) / ray.D.y;
+		float ty1 = (bmin.y - ray.O.y) * ray.rD.y, ty2 = (bmax.y - ray.O.y) * ray.rD.y;
 		tmin = max(tmin, min(ty1, ty2)), tmax = min(tmax, max(ty1, ty2));
-		float tz1 = (bmin.z - ray.O.z) / ray.D.z, tz2 = (bmax.z - ray.O.z) / ray.D.z;
+		float tz1 = (bmin.z - ray.O.z) * ray.rD.z, tz2 = (bmax.z - ray.O.z) * ray.rD.z;
 		tmin = max(tmin, min(tz1, tz2)), tmax = min(tmax, max(tz1, tz2));
 		return tmax >= tmin && tmin < ray.t&& tmax > 0;
 	}
 
-	__m128 IntersectAABBSIMD(const Ray& ray, const uint node, __m128 ray_t, __m128 ray_O_x, __m128 ray_D_x, __m128 ray_O_y, __m128 ray_D_y, __m128 ray_O_z, __m128 ray_D_z)
+	float IntersectAABBStack(const Ray& ray, const float3 bmin, const float3 bmax)
 	{
-		__m128 tx1 = _mm_div_ps(_mm_sub_ps(qbvhNode[node].bminx4, ray_O_x), ray_D_x);
-		__m128 tx2 = _mm_div_ps(_mm_sub_ps(qbvhNode[node].bmaxx4, ray_O_x), ray_D_x);
+		float tx1 = (bmin.x - ray.O.x) * ray.rD.x, tx2 = (bmax.x - ray.O.x) * ray.rD.x;
+		float tmin = min(tx1, tx2), tmax = max(tx1, tx2);
+		float ty1 = (bmin.y - ray.O.y) * ray.rD.y, ty2 = (bmax.y - ray.O.y) * ray.rD.y;
+		tmin = max(tmin, min(ty1, ty2)), tmax = min(tmax, max(ty1, ty2));
+		float tz1 = (bmin.z - ray.O.z) * ray.rD.z, tz2 = (bmax.z - ray.O.z) * ray.rD.z;
+		tmin = max(tmin, min(tz1, tz2)), tmax = min(tmax, max(tz1, tz2));
+		if (tmax >= tmin && tmin < ray.t && tmax > 0) return tmin; else return 1e30f;
+	}
 
-		//float tx1 = (bmin.x - ray.O.x) / ray.D.x, tx2 = (bmax.x - ray.O.x) / ray.D.x;
+	__m128 IntersectAABBSIMD(const Ray& ray, const uint node, __m128 ray_t, __m128 ray_O_x, __m128 ray_rD_x, __m128 ray_O_y, __m128 ray_rD_y, __m128 ray_O_z, __m128 ray_rD_z)
+	{
+
+		__m128 tx1 = _mm_mul_ps(_mm_sub_ps(qbvhNode[node].bminx4, ray_O_x), ray_rD_x);
+		__m128 tx2 = _mm_mul_ps(_mm_sub_ps(qbvhNode[node].bmaxx4, ray_O_x), ray_rD_x);
 
 		__m128 tmin = _mm_min_ps(tx1, tx2);
 		__m128 tmax = _mm_max_ps(tx1, tx2);
 
-		//float tmin = min(tx1, tx2), tmax = max(tx1, tx2);
-
-		__m128 ty1 = _mm_div_ps(_mm_sub_ps(qbvhNode[node].bminy4, ray_O_y), ray_D_y);
-		__m128 ty2 = _mm_div_ps(_mm_sub_ps(qbvhNode[node].bmaxy4, ray_O_y), ray_D_y);
-
-		//float ty1 = (bmin.y - ray.O.y) / ray.D.y, ty2 = (bmax.y - ray.O.y) / ray.D.y;
+		__m128 ty1 = _mm_mul_ps(_mm_sub_ps(qbvhNode[node].bminy4, ray_O_y), ray_rD_y);
+		__m128 ty2 = _mm_mul_ps(_mm_sub_ps(qbvhNode[node].bmaxy4, ray_O_y), ray_rD_y);
 
 		tmin = _mm_max_ps(tmin, _mm_min_ps(ty1, ty2));
 		tmax = _mm_min_ps(tmax, _mm_max_ps(ty1, ty2));
 
-		//tmin = max(tmin, min(ty1, ty2)), tmax = min(tmax, max(ty1, ty2));
-
-		__m128 tz1 = _mm_div_ps(_mm_sub_ps(qbvhNode[node].bminz4, ray_O_z), ray_D_z);
-		__m128 tz2 = _mm_div_ps(_mm_sub_ps(qbvhNode[node].bmaxz4, ray_O_z), ray_D_z);
-
-		//float tz1 = (bmin.z - ray.O.z) / ray.D.z, tz2 = (bmax.z - ray.O.z) / ray.D.z;
+		__m128 tz1 = _mm_mul_ps(_mm_sub_ps(qbvhNode[node].bminz4, ray_O_z), ray_rD_z);
+		__m128 tz2 = _mm_mul_ps(_mm_sub_ps(qbvhNode[node].bmaxz4, ray_O_z), ray_rD_z);
 
 		tmin = _mm_max_ps(tmin, _mm_min_ps(tz1, tz2));
 		tmax = _mm_min_ps(tmax, _mm_max_ps(tz1, tz2));
 
-		//tmin = max(tmin, min(tz1, tz2)), tmax = min(tmax, max(tz1, tz2));
 		return _mm_and_ps(_mm_cmpge_ps(tmax, tmin), _mm_and_ps(_mm_cmplt_ps(tmin, ray_t), _mm_cmpgt_ps(tmax, zero)));
 		/*
 		_mm_cmpge_ps(tmax, tmin);
 		_mm_cmplt_ps(tmin, tmax);
 		_mm_cmpgt_ps(tmax, zero);
-		
+
 		return tmax >= tmin && tmin < ray.t && tmax > 0;
 		*/
 	}
@@ -419,6 +507,53 @@ public:
 		}
 	}
 
+	void IntersectBVHStack (Ray& ray)
+	{
+		BVHNode& planeRootNode = bvhNode[planeRootNodeIdx];
+		for (uint i = 0; i < planeRootNode.primitiveCount; i++)
+		{
+			planes[i].Intersect(ray);
+		}
+
+		BVHNode* node = &bvhNode[primitveRootNodeIdx], * stack[64];
+		uint stackPtr = 0;
+
+		while (1)
+		{
+			if (node->isLeaf())
+			{
+				for (uint i = 0; i < node->primitiveCount; i++)
+				{
+					if (primitiveIdx[node->leftFirst + i] < spheres_size)
+					{
+						spheres[primitiveIdx[node->leftFirst + i]].Intersect(ray);
+					}
+					else
+					{
+						triangles[primitiveIdx[node->leftFirst + i] - spheres_size].Intersect(ray);
+					}
+				}
+
+				if (stackPtr == 0) break; else node = stack[--stackPtr];
+				continue;
+			}
+
+			BVHNode* child1 = &bvhNode[node->leftFirst];
+			BVHNode* child2 = &bvhNode[node->leftFirst + 1];
+			float dist1 = IntersectAABBStack(ray, child1->aabbMin, child1->aabbMax);
+			float dist2 = IntersectAABBStack(ray, child2->aabbMin, child2->aabbMax);
+			if (dist1 > dist2) { swap(dist1, dist2); swap(child1, child2); }
+			if (dist1 == 1e30f)
+			{
+				if (stackPtr == 0) break; else node = stack[--stackPtr];
+			}
+			else
+			{
+				node = child1;
+				if (dist2 != 1e30f) stack[stackPtr++] = child2;
+			}
+		}
+	}
 	void IntersectQBVH(Ray& ray)
 	{
 		SIMD_BVH_Node& rootNode = qbvhNode[0];
@@ -433,25 +568,25 @@ public:
 		__m128 ray_t = _mm_set1_ps(ray.t);
 
 		__m128 ray_O_x = _mm_set1_ps(ray.O.x);
-		__m128 ray_D_x = _mm_set1_ps(ray.D.x);
+		__m128 ray_rD_x = _mm_set1_ps(ray.rD.x);
 
 		__m128 ray_O_y = _mm_set1_ps(ray.O.y);
-		__m128 ray_D_y = _mm_set1_ps(ray.D.y);
+		__m128 ray_rD_y = _mm_set1_ps(ray.rD.y);
 
 		__m128 ray_O_z = _mm_set1_ps(ray.O.z);
-		__m128 ray_D_z = _mm_set1_ps(ray.D.z);
+		__m128 ray_rD_z = _mm_set1_ps(ray.rD.z);
 
 
 		// Primitive Child
-		IntersectQBVH(ray, rootNode.child[1], ray_t, ray_O_x, ray_D_x, ray_O_y, ray_D_y, ray_O_z, ray_D_z);
+		IntersectQBVH(ray, rootNode.child[1], ray_t, ray_O_x, ray_rD_x, ray_O_y, ray_rD_y, ray_O_z, ray_rD_z);
 
 	}
 
-	void IntersectQBVH(Ray& ray, const uint nodeIdx, __m128 ray_t, __m128 ray_O_x, __m128 ray_D_x, __m128 ray_O_y, __m128 ray_D_y, __m128 ray_O_z, __m128 ray_D_z)
+	void IntersectQBVH(Ray& ray, const uint nodeIdx, __m128 ray_t, __m128 ray_O_x, __m128 ray_rD_x, __m128 ray_O_y, __m128 ray_rD_y, __m128 ray_O_z, __m128 ray_rD_z)
 	{
 		SIMD_BVH_Node& parentNode = qbvhNode[nodeIdx];
 
-		__m128 intersect = IntersectAABBSIMD(ray, nodeIdx, ray_t, ray_O_x, ray_D_x, ray_O_y, ray_D_y, ray_O_z, ray_D_z);
+		__m128 intersect = IntersectAABBSIMD(ray, nodeIdx, ray_t, ray_O_x, ray_rD_x, ray_O_y, ray_rD_y, ray_O_z, ray_rD_z);
 
 		for (int i = 0; i < 4; i++)
 		{
@@ -476,10 +611,11 @@ public:
 			}
 			else
 			{
-				IntersectQBVH(ray, parentNode.child[i], ray_t, ray_O_x, ray_D_x, ray_O_y, ray_D_y, ray_O_z, ray_D_z);
+				IntersectQBVH(ray, parentNode.child[i], ray_t, ray_O_x, ray_rD_x, ray_O_y, ray_rD_y, ray_O_z, ray_rD_z);
 			}
 		}
 	}
+
 	bool IntersectBVHShadowRay(Ray& ray, bool isOccluded)
 	{
 		if (isOccluded)
@@ -547,24 +683,24 @@ public:
 		__m128 ray_t = _mm_set1_ps(ray.t);
 
 		__m128 ray_O_x = _mm_set1_ps(ray.O.x);
-		__m128 ray_D_x = _mm_set1_ps(ray.D.x);
+		__m128 ray_rD_x = _mm_set1_ps(ray.rD.x);
 
 		__m128 ray_O_y = _mm_set1_ps(ray.O.y);
-		__m128 ray_D_y = _mm_set1_ps(ray.D.y);
+		__m128 ray_rD_y = _mm_set1_ps(ray.rD.y);
 
 		__m128 ray_O_z = _mm_set1_ps(ray.O.z);
-		__m128 ray_D_z = _mm_set1_ps(ray.D.z);
+		__m128 ray_rD_z = _mm_set1_ps(ray.rD.z);
 
-		return IntersectQBVHShadowRay(ray, isOccluded, rootNode.child[1], ray_t, ray_O_x, ray_D_x, ray_O_y, ray_D_y, ray_O_z, ray_D_z);
+		return IntersectQBVHShadowRay(ray, isOccluded, rootNode.child[1], ray_t, ray_O_x, ray_rD_x, ray_O_y, ray_rD_y, ray_O_z, ray_rD_z);
 	}
 
-	bool IntersectQBVHShadowRay(Ray& ray, bool isOccluded, const uint nodeIdx, __m128 ray_t, __m128 ray_O_x, __m128 ray_D_x, __m128 ray_O_y, __m128 ray_D_y, __m128 ray_O_z, __m128 ray_D_z)
+	bool IntersectQBVHShadowRay(Ray& ray, bool isOccluded, const uint nodeIdx, __m128 ray_t, __m128 ray_O_x, __m128 ray_rD_x, __m128 ray_O_y, __m128 ray_rD_y, __m128 ray_O_z, __m128 ray_rD_z)
 	{
 		if (isOccluded)
 			return isOccluded;
 
 		SIMD_BVH_Node& parentNode = qbvhNode[nodeIdx];
-		__m128 intersect = IntersectAABBSIMD(ray, nodeIdx, ray_t, ray_O_x, ray_D_x, ray_O_y, ray_D_y, ray_O_z, ray_D_z);
+		__m128 intersect = IntersectAABBSIMD(ray, nodeIdx, ray_t, ray_O_x, ray_rD_x, ray_O_y, ray_rD_y, ray_O_z, ray_rD_z);
 
 
 		bool prevOccluded = false;
@@ -594,11 +730,10 @@ public:
 			}
 			else
 			{
-				prevOccluded = prevOccluded || IntersectQBVHShadowRay(ray, prevOccluded, parentNode.child[j], ray_t, ray_O_x, ray_D_x, ray_O_y, ray_D_y, ray_O_z, ray_D_z);
+				prevOccluded = prevOccluded || IntersectQBVHShadowRay(ray, prevOccluded, parentNode.child[j], ray_t, ray_O_x, ray_rD_x, ray_O_y, ray_rD_y, ray_O_z, ray_rD_z);
 			}
 		}
 		return prevOccluded;
 	}
 
 };
-
