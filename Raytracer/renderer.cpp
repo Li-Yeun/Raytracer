@@ -80,10 +80,11 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 
 	if (ray.objIdx == -1) return 0; // or a fancy sky color
 	float3 intersection = ray.O + ray.t * ray.D;
-	float3 normal = scene.GetNormal( ray.objIdx, intersection, ray.D );
-	float3 albedo = scene.GetAlbedo( ray.objIdx, intersection); // TODO no longer needed, change to material.color (but then we need to make materials for the different objects
 
 	Material material = scene.GetMaterial(ray.objIdx);
+	float3 normal = scene.GetNormal( ray.objIdx, intersection, ray.D );
+	float3 albedo = scene.GetAlbedo( ray.objIdx, intersection, material); // TODO no longer needed, change to material.color (but then we need to make materials for the different objects
+
 	switch (visualizationMode) {
 		case RayTracing:
 		  if (material.type == Material::MaterialType::DIFFUSE || material.type == Material::MaterialType::LIGHT) // (dirty fix for light materials in whitted renderer)

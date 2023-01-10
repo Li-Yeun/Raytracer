@@ -43,7 +43,7 @@ public:
     Triangle* triangles = 0;
 
     int* primitiveIdx = 0;
-
+	
     BVHNode* bvhNode = 0;
     uint rootNodeIdx = 0, planeRootNodeIdx = 1, primitveRootNodeIdx = 2, nodesUsed = 3;
 
@@ -62,8 +62,6 @@ public:
 	{
         BuildBVH();
 		BuildQBVH();
-		std::cout << nodesUsed << std::endl;
-		std::cout << nodesUsedQBVH << std::endl;
 
 	}
 	void CollapseBVH(int nodeIdx)
@@ -100,10 +98,10 @@ public:
 
 				int left_child = parentNode.child[greatest_child];
 				int right_child = parentNode.child[greatest_child] + 1;
-
+				
 
 				// Left Child
-
+					
 				parentNode.count[greatest_child] = bvhNode[left_child].primitiveCount;
 				parentNode.child[greatest_child] = bvhNode[left_child].leftFirst;
 
@@ -117,7 +115,7 @@ public:
 				// Right Child
 				parentNode.count[i] = bvhNode[right_child].primitiveCount;
 				parentNode.child[i] = bvhNode[right_child].leftFirst;
-
+					
 				/*
 				std::cout << "greatest_child: " << greatest_child << std::endl;
 				std::cout << "left_child: " << left_child << std::endl;
@@ -141,7 +139,7 @@ public:
 				{
 					//std::cout << parentNode.child[k] << std::endl;
 				}
-
+				
 
 			}
 		}
@@ -466,7 +464,7 @@ public:
 		_mm_cmpge_ps(tmax, tmin);
 		_mm_cmplt_ps(tmin, tmax);
 		_mm_cmpgt_ps(tmax, zero);
-
+		
 		return tmax >= tmin && tmin < ray.t && tmax > 0;
 		*/
 	}

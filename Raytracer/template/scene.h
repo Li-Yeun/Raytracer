@@ -40,24 +40,26 @@ public:
     Scene()
     {
         def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
+        red_mat = Material(Material::MaterialType::DIFFUSE, float3(0.93f, 0.21f, 0.21f), 0);
+        cyan_mat = Material(Material::MaterialType::DIFFUSE, float3(0.11f, 0.95f, 0.91f), 0);
         mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
         absorb_all_but_blue_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 1.0f));
         glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
-        light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(10.0f));
+        light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(2.0f));
 
 
         quads_size = 1;
-        quads = new Quad[quads_size] { Quad(id++, 1, light_mat) };                              // 0: light source
-
+        quads = new Quad[quads_size] { Quad(id++, 3, light_mat) };                              // 0: light source
+                  
         spheres_size = 2;
-        spheres = new Sphere[spheres_size]{
+        spheres = new Sphere[spheres_size]{ 
             Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, absorb_all_but_blue_mat),                             // 1: bouncing ball
-            Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners
+            Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners		
 
         cubes_size = 1;
-        cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(1.15f), def_mat) };         // 3: cube
-
-        planes_size = 6;
+        cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(0.75f), def_mat) };         // 3: cube
+               
+        planes_size = 6;                                                                                                
         planes = new Plane[planes_size]{
             Plane(id++, float3(1, 0, 0), 3, mirror_mat),                                        // 4: left wall
             Plane(id++, float3(-1, 0, 0), 2.99f, def_mat),										// 5: right wall
@@ -67,17 +69,22 @@ public:
             Plane(id++, float3(0, 0, -1), 3.99f, def_mat)										// 9: back wall
         };
 
-        LoadObject("assets/small_monkey.obj", def_mat, float3(0, 0, 1));
-        LoadObject("assets/small_monkey.obj", def_mat, float3(1, 0, 1));
-        LoadObject("assets/small_monkey.obj", def_mat, float3(-1, 0, 1));
+        std::cout << "Loading objects ..." << std::endl;
+
+        LoadObject("assets/monkey.obj", glass_mat, float3(0, 0, 1.5));
+        LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
 
         bvh = new BVH(spheres, spheres_size, planes, planes_size, triangles, triangles_size);
         SetTime( 0 );
         // Note: once we have triangle support we should get rid of the class
         // hierarchy: virtuals reduce performance somewhat.
+
+        std::cout << std::endl << triangles_size << " Triangles loaded" << std::endl << std::endl << std::endl;
     }
     void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
     {
+        std::cout << "Loading: " << inputfile << std::endl;
         tinyobj::ObjReaderConfig reader_config;
         reader_config.mtl_search_path = "./assets"; // Path to material files
 
@@ -122,7 +129,7 @@ public:
                 Triangle newTriangle = Triangle(id + vf, vx + transform, vy + transform, vz + transform, material);
                 newTriangles[vf] = newTriangle;
             }
-
+            
             id += size;
 
             if (triangles_size == 0)
@@ -143,6 +150,7 @@ public:
                 triangles_size = triangles_size + size;
             }
         }
+        std::cout << "loaded: " << triangles_size << " in total" << std::endl;
     }
     void SetTime( float t )
     {
@@ -150,7 +158,7 @@ public:
         // enables animation. Updating it per ray can be used for motion blur.
         animTime = 0;
 
-
+        
 
         if (isDynamic) animTime = t;
         // light source animation: swing
@@ -164,7 +172,7 @@ public:
         // sphere animation: bounce
         float tm = 1 - sqrf( fmodf( animTime, 2.0f ) - 1 );
         //spheres[0].pos = float3( -1.4f, -0.5f + tm, 2 );
-
+        
     }
     float3 * GetLightPos()
     {
@@ -238,7 +246,7 @@ public:
         if (dot( N, wo ) > 0) N = -N; // hit backside / inside
         return N;
     }
-    float3 GetAlbedo( int objIdx, float3 I ) const
+    float3 GetAlbedo( int objIdx, float3 I, Material mat ) const
     {
 
         if (objIdx == -1) return float3( 0 ); // or perhaps we should just crash
@@ -251,13 +259,13 @@ public:
         lowerLimit = upperLimit;
         upperLimit += spheres_size;
         if (objIdx >= lowerLimit && objIdx < upperLimit)
-            return spheres[objIdx - lowerLimit].GetAlbedo(I);
+            return mat.color;
 
         lowerLimit = upperLimit;
         upperLimit += cubes_size;
 
         if (objIdx >= lowerLimit && objIdx < upperLimit)
-            return cubes[objIdx - lowerLimit].GetAlbedo(I);
+            return mat.color;
 
         lowerLimit = upperLimit;
         upperLimit += planes_size;
@@ -267,7 +275,7 @@ public:
              return planes[objIdx - lowerLimit].GetAlbedo(I);
         }
 
-        if (objIdx >= upperLimit) return triangles[objIdx - upperLimit].GetAlbedo(I);
+        if (objIdx >= upperLimit) return mat.color;
 
     }
 
@@ -401,7 +409,7 @@ public:
     int planes_size = 0;
     int triangles_size = 0;
 
-    Material def_mat, mirror_mat, glass_mat, light_mat, absorb_all_but_blue_mat;
+    Material def_mat, mirror_mat, glass_mat, light_mat, absorb_all_but_blue_mat, red_mat, cyan_mat;
     BVH* bvh = 0;
     int id = 0;
 
