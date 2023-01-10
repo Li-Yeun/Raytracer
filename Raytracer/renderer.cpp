@@ -8,6 +8,40 @@ void Renderer::Init()
 	// create fp32 rgb pixel buffer to render to
 	accumulator = (float4*)MALLOC64( SCRWIDTH * SCRHEIGHT * 16 );
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
+
+	// Create Kernels
+	generatePrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GeneratePrimaryRays");
+	extendKernel = new Kernel("Kernels/extend.cl", "Extend");
+	shadeKernel = new Kernel("Kernels/shade.cl", "Shade");
+	connectKernel = new Kernel("Kernels/connect.cl", "Connect");
+	finalizeKernel = new Kernel("Kernels/finalize.cl", "Finalize");
+
+	// Create Buffers
+
+	/* Examples
+	deviceBuffer = new Buffer(map.width * map.height, 0, map.bitmap->pixels);
+	tankOldPosBuffer = new Buffer(totalTanks * 2, CL_MEM_READ_ONLY, tankOldPos);
+	*/
+
+	// Initialze Kernels
+
+	/* Example
+	bushDrawKernel->SetArgument(0, deviceBuffer);
+	bushDrawKernel->SetArgument(1, bushSpriteBuffer);
+	bushDrawKernel->SetArgument(2, bushTypeBuffer);
+	*/
+
+
+	// Copy Buffer data from CPU to GPU
+	// bushSpriteBuffer->CopyToDevice(false);
+
+	// Execute 1D and 2D kernels examples
+	//bulletSaveLastPosKernel->Run(maxBullets);
+	//bulletBackupKernel->Run2D(int2(bulletSprite->frameSize * bulletSprite->frameSize, maxBullets), int2(bulletSprite->frameSize, 1));
+
+	// Copy Buffer data from GPU to CPU
+	//deviceBuffer->CopyFromDevice();
+
 }
 
 /// <summary>

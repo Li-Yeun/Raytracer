@@ -58,7 +58,12 @@ public:
 	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
 
-
+	//Kernels
+	static inline Kernel* generatePrimaryRaysKernel;
+	static inline Kernel* extendKernel;
+	static inline Kernel* shadeKernel;
+	static inline Kernel* connectKernel;
+	static inline Kernel* finalizeKernel;
 };
 
 } // namespace Tmpl8
