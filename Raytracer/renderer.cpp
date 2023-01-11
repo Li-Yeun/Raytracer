@@ -1,4 +1,4 @@
-#include "precomp.h"
+﻿#include "precomp.h"
 
 // -----------------------------------------------------------
 // Initialize the renderer
@@ -17,6 +17,12 @@ void Renderer::Init()
 	finalizeKernel = new Kernel("Kernels/finalize.cl", "Finalize");
 
 	// Create Buffers
+	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * 16, accumulator, 0);
+
+
+	generatePrimaryRaysKernel->SetArguments(accumulatorBuffer);
+	
+	accumulatorBuffer->CopyToDevice(true);
 
 	/* Examples
 	deviceBuffer = new Buffer(map.width * map.height, 0, map.bitmap->pixels);
@@ -218,6 +224,60 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 	}
 }
 
+float3 Renderer::Sample(Ray& ray)
+{
+	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
+	while (1)
+	{
+		scene.FindNearest(ray);
+		if (ray.objIdx == -1) break;
+
+		Material material = scene.GetMaterial(ray.objIdx);
+		if (material.type == Material::MaterialType::LIGHT) break;
+
+		float3 intersection = ray.O + ray.t * ray.D;
+
+		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
+		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+
+		float3 BRDF = albedo / PI;
+		// sample a random light source
+
+		float A;
+		float3 Nl, light_point;
+		std::make_tuple(A, Nl, light_point);
+		std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
+		A = std::get<0>(result);
+		Nl = std::get<1>(result);
+		light_point = std::get<2>(result);
+
+		float3 L = light_point - intersection;
+		float LMag = magnitude(L);
+		L = normalize(L);
+
+		Ray lr = Ray(intersection + L * 0.001f, L, LMag - 2 * 0.001f);
+		scene.FindNearest(lr);
+		if (dot(normal, L) > 0 && dot(Nl,-L) > 0 && lr.objIdx == -1)
+		{
+			float solidAngle = (dot(Nl,-L) * A) / sqr(LMag);
+			float lightPDF = 1.0f / solidAngle;
+			E += T * (dot(normal,L) / lightPDF) * BRDF * std::get<3>(result);
+		}
+
+		// Russian Roulette
+		float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
+		if (p < RandomFloat()) break; else /* whew still alive */ T *= 1.0f / p;
+
+		// continue random walk
+		float3 R = scene.DiffuseReflection(normal);
+		float hemiPDF = 1 / (PI * 2.0f);
+		ray = Ray(intersection, R);
+		T *= (dot(normal,R) / hemiPDF) * BRDF;
+	}
+	return E;
+
+}
+
 void Renderer::KeyDown(int key) {
 	float velocity = .05f;
 	switch (key) {
@@ -314,7 +374,8 @@ void Renderer::Tick(float deltaTime)
 			// trace a primary ray for each pixel on the line
 			for (int x = 0; x < SCRWIDTH; x++)
 				accumulator[x + y * SCRWIDTH] +=
-				float4(Trace(camera->GetPrimaryRay(x, y), 0), 0);
+				float4(Sample(camera->GetPrimaryRay(x, y)), 0);
+				//float4(Trace(camera->GetPrimaryRay(x, y), 0), 0);
 			// translate accumulator contents to rgb32 pixels
 			for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
 				screen->pixels[dest + x] =
@@ -367,6 +428,24 @@ void Renderer::Tick(float deltaTime)
 
 		camera->Update();
 	}
+
+	/*
+	generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+	accumulatorBuffer->CopyFromDevice(false);
+
+	// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+#pragma omp parallel for schedule(dynamic)
+	for (int y = 0; y < SCRHEIGHT; y++)
+	{
+		// trace a primary ray for each pixel on the line
+		for (int x = 0; x < SCRWIDTH; x++)
+		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
+			screen->pixels[dest + x] =
+			RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH]);
+	}
+	*/
+
 	// performance report - running average - ms, MRays/s
 	static float avg = 10, alpha = 1;
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;
@@ -374,4 +453,5 @@ void Renderer::Tick(float deltaTime)
 	float fps = 1000 / avg, rps = (SCRWIDTH * SCRHEIGHT) * fps;
 	//std::cout << camera.Direction().x << ", " << camera.Direction().y << ", " << camera.Direction().z << std::endl;
 	printf("%5.2fms (%.1fps) - %.1fMrays/s\n", avg, fps, rps / 1000000);
+
 }

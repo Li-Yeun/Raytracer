@@ -11,6 +11,7 @@ public:
 	void Init();
 	float3 ComputePixelColorGlass(float3 intersection, float3 normal, float3 albedo, Material& material, Ray& ray, int recursion_depth);
 	float3 Trace( Ray& ray, int recursion_depth);
+	float3 Sample(Ray& ray);
 	void Tick( float deltaTime );
 	void Shutdown() { /* implement if you want to do something on exit */ }
 	// input handling
@@ -64,6 +65,9 @@ public:
 	static inline Kernel* shadeKernel;
 	static inline Kernel* connectKernel;
 	static inline Kernel* finalizeKernel;
+
+	//Buffer
+	static inline Buffer* accumulatorBuffer;
 };
 
 } // namespace Tmpl8

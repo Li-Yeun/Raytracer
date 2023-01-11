@@ -174,6 +174,33 @@ public:
         //spheres[0].pos = float3( -1.4f, -0.5f + tm, 2 );
         
     }
+
+    std::tuple<float, float3, float3, float3> RandomPointOnLight()
+    {
+        // Pick random light source
+        Quad light_source = quads[0];
+        
+        // Pick random position
+        float3 Nl = light_source.GetNormal(float3(0));
+        float A = sqr(light_source.s);
+
+        float3 c1 = light_source.T * float3(-light_source.size, 0, -light_source.size);
+        float3 c2 = light_source.T * float3(-light_source.size, 0, light_source.size);
+        float3 c3 = light_source.T * float3(light_source.size, 0, light_source.size);
+        
+        float3 c1c2 = c1 - c2;
+        float randomLength = RandomFloat() * light_source.s;
+        float3 u = c1c2 * randomLength;
+
+        float3 c2c3 = c3 - c2;
+        randomLength = RandomFloat() * light_source.s;
+        float3 v = c2c3 * randomLength;
+
+        float3 light_point = GetLightPos()[0];//c2 + u + v;
+
+        return std::make_tuple(A, Nl, light_point, light_source.material.emission);
+    }
+
     float3 * GetLightPos()
     {
         // light point position is the middle of the swinging quad

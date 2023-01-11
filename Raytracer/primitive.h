@@ -268,7 +268,7 @@ namespace Tmpl8 {
     {
     public:
         Quad() = default;
-        Quad(int idx, float s, Material mat, mat4 transform = mat4::Identity()) : material(mat)
+        Quad(int idx, float s, Material mat, mat4 transform = mat4::Identity()) : s(s), material(mat)
         {
             objIdx = idx;
             size = s * 0.5f;
@@ -295,7 +295,7 @@ namespace Tmpl8 {
         {
             return float3(10);
         }
-        float size;
+        float size, s;
         mat4 T, invT;
         int objIdx = -1;
         Material material;
