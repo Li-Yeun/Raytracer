@@ -227,13 +227,20 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 float3 Renderer::Sample(Ray& ray)
 {
 	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
+	bool lastSpecular = true;
 	while (1)
 	{
 		scene.FindNearest(ray);
 		if (ray.objIdx == -1) break;
 
 		Material material = scene.GetMaterial(ray.objIdx);
-		if (material.type == Material::MaterialType::LIGHT) break;
+		if (material.type == Material::MaterialType::LIGHT)
+		{
+			if (lastSpecular)
+				return material.emission;
+
+			break;
+		}
 
 		float3 intersection = ray.O + ray.t * ray.D;
 
@@ -241,25 +248,22 @@ float3 Renderer::Sample(Ray& ray)
 		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
 
 		float3 BRDF = albedo / PI;
+
 		// sample a random light source
-
-		float A;
-		float3 Nl, light_point;
-		std::make_tuple(A, Nl, light_point);
 		std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
-		A = std::get<0>(result);
-		Nl = std::get<1>(result);
-		light_point = std::get<2>(result);
 
+		float A = std::get<0>(result);
+		float3 Nl = std::get<1>(result);
+		float3 light_point = std::get<2>(result);
 		float3 L = light_point - intersection;
-		float LMag = magnitude(L);
+		float dist = magnitude(L);
 		L = normalize(L);
 
-		Ray lr = Ray(intersection + L * 0.001f, L, LMag - 2 * 0.001f);
-		scene.FindNearest(lr);
-		if (dot(normal, L) > 0 && dot(Nl,-L) > 0 && lr.objIdx == -1)
+		Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
+
+		if (dot(normal, L) > 0 && dot(Nl,-L) > 0 && !scene.IsOccluded(lr))
 		{
-			float solidAngle = (dot(Nl,-L) * A) / sqr(LMag);
+			float solidAngle = (dot(Nl,-L) * A) / sqrf(dist);
 			float lightPDF = 1.0f / solidAngle;
 			E += T * (dot(normal,L) / lightPDF) * BRDF * std::get<3>(result);
 		}
@@ -270,9 +274,10 @@ float3 Renderer::Sample(Ray& ray)
 
 		// continue random walk
 		float3 R = scene.DiffuseReflection(normal);
-		float hemiPDF = 1 / (PI * 2.0f);
-		ray = Ray(intersection, R);
+		float hemiPDF = 1.0f / (PI * 2.0f);
+		ray = Ray(intersection + R * 0.001f, R);
 		T *= (dot(normal,R) / hemiPDF) * BRDF;
+		lastSpecular = false;
 	}
 	return E;
 

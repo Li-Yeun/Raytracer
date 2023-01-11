@@ -182,21 +182,21 @@ public:
         
         // Pick random position
         float3 Nl = light_source.GetNormal(float3(0));
-        float A = sqr(light_source.s);
+        float A = sqrf(light_source.s);
 
-        float3 c1 = light_source.T * float3(-light_source.size, 0, -light_source.size);
-        float3 c2 = light_source.T * float3(-light_source.size, 0, light_source.size);
-        float3 c3 = light_source.T * float3(light_source.size, 0, light_source.size);
+        float3 c1 = TransformPosition(float3(-light_source.size, 0, -light_source.size), light_source.T);
+        float3 c2 = TransformPosition(float3(light_source.size, 0, -light_source.size), light_source.T);
+        float3 c3 = TransformPosition(float3(light_source.size, 0, light_source.size), light_source.T);
         
-        float3 c1c2 = c1 - c2;
+        float3 c1c2 = normalize(c1 - c2);
         float randomLength = RandomFloat() * light_source.s;
         float3 u = c1c2 * randomLength;
 
-        float3 c2c3 = c3 - c2;
+        float3 c2c3 = normalize(c3 - c2);
         randomLength = RandomFloat() * light_source.s;
         float3 v = c2c3 * randomLength;
 
-        float3 light_point = GetLightPos()[0];//c2 + u + v;
+        float3 light_point = c2 + u + v - float3(0, 0.01f, 0);
 
         return std::make_tuple(A, Nl, light_point, light_source.material.emission);
     }
@@ -204,8 +204,8 @@ public:
     float3 * GetLightPos()
     {
         // light point position is the middle of the swinging quad
-        float3 corner1 = TransformPosition( float3( -0.5f, 0, -0.5f ), quads[0].T );
-        float3 corner2 = TransformPosition( float3( 0.5f, 0, 0.5f ), quads[0].T );
+        float3 corner1 = TransformPosition( float3( -quads[0].size, 0, -quads[0].size), quads[0].T );
+        float3 corner2 = TransformPosition( float3( quads[0].size, 0, quads[0].size), quads[0].T );
         float3 lights[] = { (corner1 + corner2) * 0.5f - float3(0, 0.01f, 0), lightPos };
         return lights;
     }
