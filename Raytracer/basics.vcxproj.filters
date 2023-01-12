@@ -54,10 +54,28 @@
     <Filter Include="tinyobjLoader">
       <UniqueIdentifier>{e2a10a4f-3249-44cf-965c-5dd2c614542c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="GPU code">
+      <UniqueIdentifier>{1b9122fe-a68f-40fe-b797-eb77a4c5eaf8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <None Include="template\LICENSE">
       <Filter>template</Filter>
+    </None>
+    <None Include="kernels\connect.cl">
+      <Filter>GPU code</Filter>
+    </None>
+    <None Include="kernels\extend.cl">
+      <Filter>GPU code</Filter>
+    </None>
+    <None Include="kernels\finalize.cl">
+      <Filter>GPU code</Filter>
+    </None>
+    <None Include="kernels\generatePrimaryRays.cl">
+      <Filter>GPU code</Filter>
+    </None>
+    <None Include="kernels\shade.cl">
+      <Filter>GPU code</Filter>
     </None>
   </ItemGroup>
 </Project>
