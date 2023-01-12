@@ -227,6 +227,66 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 float3 Renderer::Sample(Ray& ray)
 {
 	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
+	bool lastSpecular = true;
+
+	while (1)
+	{
+		scene.FindNearest(ray);
+		if (ray.objIdx == -1) break;
+
+		Material material = scene.GetMaterial(ray.objIdx);
+
+		if (material.type == Material::MaterialType::LIGHT)
+		{
+			if (lastSpecular)
+				return  material.emission;
+
+			break;
+		}
+
+		float3 intersection = ray.O + ray.t * ray.D;
+		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
+		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+		float3 BRDF = albedo / PI;
+
+		// sample a random light source
+		std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
+
+		float A = std::get<0>(result);
+		float3 Nl = std::get<1>(result);
+		float3 light_point = std::get<2>(result);
+		float3 L = light_point - intersection;
+		float dist = magnitude(L);
+		L = normalize(L);
+
+		Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
+
+		if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
+		{
+			float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
+			float lightPDF = 1.0f / solidAngle;
+			E += T * (dot(normal, L) / lightPDF) * BRDF * std::get<3>(result);
+		}
+
+		// Russian Roulette
+		float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
+		if (p < RandomFloat()) break; else T *= 1.0f / p;
+
+		// continue random walk
+		float3 R = scene.DiffuseReflection(normal);
+		float hemiPDF = 1.0f / (PI * 2.0f);
+		ray = Ray(intersection + R * 0.001f, R);
+		T *= (dot(normal, R) / hemiPDF) * BRDF;
+
+		lastSpecular = false;
+	}
+	return E;
+
+}
+/*	FULL SAMPLE CODE WITH GLASS AND MIRROR
+float3 Renderer::Sample(Ray& ray)
+{
+	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
 
 	bool lastSpecular = true;
 	float3 lastAbsorption = float3(1.0f);
@@ -277,7 +337,7 @@ float3 Renderer::Sample(Ray& ray)
 
 			// Russian Roulette
 			float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
-			if (p < RandomFloat()) break; else /* whew still alive */ T *= 1.0f / p;
+			if (p < RandomFloat()) break; else T *= 1.0f / p;
 
 			// continue random walk
 			float3 R = scene.DiffuseReflection(normal);
@@ -349,6 +409,7 @@ float3 Renderer::Sample(Ray& ray)
 	return E;
 
 }
+*/
 
 void Renderer::KeyDown(int key) {
 	float velocity = .05f;
