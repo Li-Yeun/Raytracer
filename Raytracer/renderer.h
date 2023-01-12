@@ -77,6 +77,7 @@ public:
 				accumulator[x + y * SCRWIDTH] =
 				float4(0);
 		}
+		accumulatorBuffer->CopyToDevice();
 	}
 
 	//Kernels
@@ -87,6 +88,8 @@ public:
 	static inline Kernel* finalizeKernel;
 
 	//Buffer
+
+	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
 };
 

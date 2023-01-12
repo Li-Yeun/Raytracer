@@ -17,12 +17,16 @@ void Renderer::Init()
 	finalizeKernel = new Kernel("Kernels/finalize.cl", "Finalize");
 
 	// Create Buffers
-	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * 16, accumulator, 0);
+	deviceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), screen->pixels, 0);
+	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
 
 
 	generatePrimaryRaysKernel->SetArguments(accumulatorBuffer);
-	
-	accumulatorBuffer->CopyToDevice(true);
+	accumulatorBuffer->CopyToDevice(false);
+
+	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
+	deviceBuffer->CopyToDevice(true);
+
 
 	/* Examples
 	deviceBuffer = new Buffer(map.width * map.height, 0, map.bitmap->pixels);
@@ -501,20 +505,15 @@ void Renderer::Tick(float deltaTime)
 	{
 		if (useGPU)
 		{
+			accumulatedFrames += 1;
+
 			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			accumulatorBuffer->CopyFromDevice(false);
+			finalizeKernel->S(2, (int) accumulatedFrames);
+			finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
-#pragma omp parallel for schedule(dynamic)
-			for (int y = 0; y < SCRHEIGHT; y++)
-			{
-				// trace a primary ray for each pixel on the line
-				for (int x = 0; x < SCRWIDTH; x++)
-					for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-						screen->pixels[dest + x] =
-						RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH]);
-			}
+			deviceBuffer->CopyFromDevice();
+
 		}
 		else {
 			accumulatedFrames += 1;
