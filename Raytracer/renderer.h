@@ -59,6 +59,26 @@ public:
 	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
 
+	// GPU Setting
+	bool useGPU = true;
+
+	void SetGPU(bool mode) { 
+		useGPU = mode; 
+
+		// TODO Clearing frame is maybe unnecessary when GPU fully works
+
+		accumulatedFrames = 0;
+		//Clear accumulator
+#pragma omp parallel for schedule(dynamic)
+		for (int y = 0; y < SCRHEIGHT; y++)
+		{
+			// trace a primary ray for each pixel on the line
+			for (int x = 0; x < SCRWIDTH; x++)
+				accumulator[x + y * SCRWIDTH] =
+				float4(0);
+		}
+	}
+
 	//Kernels
 	static inline Kernel* generatePrimaryRaysKernel;
 	static inline Kernel* extendKernel;

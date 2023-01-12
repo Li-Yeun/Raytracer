@@ -499,20 +499,39 @@ void Renderer::Tick(float deltaTime)
 
 	if (visualizationMode == PathTracing)
 	{
-		accumulatedFrames += 1;
-		// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
-		#pragma omp parallel for schedule(dynamic)
-		for (int y = 0; y < SCRHEIGHT; y++)
+		if (useGPU)
 		{
-			// trace a primary ray for each pixel on the line
-			for (int x = 0; x < SCRWIDTH; x++)
-				accumulator[x + y * SCRWIDTH] +=
-				float4(Sample(camera->GetPrimaryRay(x, y)), 0);
+			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			accumulatorBuffer->CopyFromDevice(false);
+
+			// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+#pragma omp parallel for schedule(dynamic)
+			for (int y = 0; y < SCRHEIGHT; y++)
+			{
+				// trace a primary ray for each pixel on the line
+				for (int x = 0; x < SCRWIDTH; x++)
+					for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
+						screen->pixels[dest + x] =
+						RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH]);
+			}
+		}
+		else {
+			accumulatedFrames += 1;
+			// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+#pragma omp parallel for schedule(dynamic)
+			for (int y = 0; y < SCRHEIGHT; y++)
+			{
+				// trace a primary ray for each pixel on the line
+				for (int x = 0; x < SCRWIDTH; x++)
+					accumulator[x + y * SCRWIDTH] +=
+					float4(Sample(camera->GetPrimaryRay(x, y)), 0);
 				//float4(Trace(camera->GetPrimaryRay(x, y), 0), 0);
 			// translate accumulator contents to rgb32 pixels
-			for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-				screen->pixels[dest + x] =
-				RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH], accumulatedFrames);
+				for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
+					screen->pixels[dest + x] =
+					RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH], accumulatedFrames);
+			}
 		}
 	}
 	else {
@@ -561,23 +580,6 @@ void Renderer::Tick(float deltaTime)
 
 		camera->Update();
 	}
-
-	/*
-	generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
-
-	accumulatorBuffer->CopyFromDevice(false);
-
-	// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
-#pragma omp parallel for schedule(dynamic)
-	for (int y = 0; y < SCRHEIGHT; y++)
-	{
-		// trace a primary ray for each pixel on the line
-		for (int x = 0; x < SCRWIDTH; x++)
-		for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-			screen->pixels[dest + x] =
-			RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH]);
-	}
-	*/
 
 	// performance report - running average - ms, MRays/s
 	static float avg = 10, alpha = 1;
