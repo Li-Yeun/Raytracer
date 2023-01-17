@@ -91,6 +91,17 @@ public:
 
 	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
+
+	// DELETE LATER
+	float3* origins, *directions;
+	float* distances;
+	int* primIdxs;
+
+	static inline Buffer* originBuffer;
+	static inline Buffer* directionBuffer;
+	static inline Buffer* distanceBuffer;
+	static inline Buffer* primIdxBuffer;
+
 };
 
 } // namespace Tmpl8

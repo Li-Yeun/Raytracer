@@ -20,11 +20,28 @@ void Renderer::Init()
 	deviceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), screen->pixels, 0);
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
 
+	// DELETE LATER
+	origins = new float3[SCRWIDTH * SCRHEIGHT];
+	directions = new float3[SCRWIDTH * SCRHEIGHT];
+	distances = new float[SCRWIDTH * SCRHEIGHT];
+	primIdxs = new int[SCRWIDTH * SCRHEIGHT];
 
-	generatePrimaryRaysKernel->SetArguments(accumulatorBuffer);
-	accumulatorBuffer->CopyToDevice(false);
+	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), origins, 0);
+	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), directions, 0);
+	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), distances, 0);
+	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
+
+
+	generatePrimaryRaysKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer);
+
+	// DELETE LATER
+	originBuffer->CopyToDevice(false);
+	directionBuffer->CopyToDevice(false);
+	distanceBuffer->CopyToDevice(false);
+	primIdxBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
+	accumulatorBuffer->CopyToDevice(false);
 	deviceBuffer->CopyToDevice(true);
 
 
@@ -507,12 +524,47 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
+			generatePrimaryRaysKernel->S(4, camera->aspect);
+			generatePrimaryRaysKernel->S(5, camera->camPos);
+
 			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			finalizeKernel->S(2, (int) accumulatedFrames);
-			finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
+			originBuffer->CopyFromDevice(false);
+			directionBuffer->CopyFromDevice(false);
+			distanceBuffer->CopyFromDevice(false);
+			primIdxBuffer->CopyFromDevice(true);
 
-			deviceBuffer->CopyFromDevice();
+			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
+			{
+				if (distances[i] == -1.0f)
+					continue;
+
+				Ray ray = Ray(origins[i], directions[i], distances[i]);
+
+				scene.quads[0].Intersect(ray);
+				scene.cubes[0].Intersect(ray);
+
+				if (scene.useQBVH)
+					scene.bvh->IntersectQBVH(ray);
+				else
+					scene.bvh->IntersectBVH(ray);
+
+				if (ray.objIdx == -1)
+					ray.t = -1.0f;
+
+				distances[i] = ray.t;
+				primIdxs[i] = ray.objIdx;
+			}
+
+			distanceBuffer->CopyToDevice(false);
+			primIdxBuffer->CopyToDevice(true);
+
+
+
+			//finalizeKernel->S(2, (int) accumulatedFrames);
+			//finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			//deviceBuffer->CopyFromDevice();
 
 		}
 		else {
