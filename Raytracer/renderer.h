@@ -89,6 +89,7 @@ public:
 
 	//Buffer
 
+	// Screen Buffers
 	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
 
@@ -97,11 +98,22 @@ public:
 	float* distances;
 	int* primIdxs;
 
+	// Ray Buffers
 	static inline Buffer* originBuffer;
 	static inline Buffer* directionBuffer;
 	static inline Buffer* distanceBuffer;
 	static inline Buffer* primIdxBuffer;
 
+	// DELETE LATER
+	float3* shadowOrigins, *shadowDirections;
+	float* shadowDistances;
+
+	// Shadow Ray Buffers
+	static inline Buffer* shadowOriginBuffer;
+	static inline Buffer* shadowDirectionBuffer;
+	static inline Buffer* shadowDistanceBuffer;
+	static inline Buffer* energyBuffer;
+	static inline Buffer* pixelIdxBuffer;
 };
 
 } // namespace Tmpl8

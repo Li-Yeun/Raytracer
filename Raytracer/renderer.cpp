@@ -26,11 +26,11 @@ void Renderer::Init()
 	distances = new float[SCRWIDTH * SCRHEIGHT];
 	primIdxs = new int[SCRWIDTH * SCRHEIGHT];
 
+	// Ray Buffers
 	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), origins, 0);
 	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), directions, 0);
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), distances, 0);
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
-
 
 	generatePrimaryRaysKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer);
 
@@ -40,10 +40,32 @@ void Renderer::Init()
 	distanceBuffer->CopyToDevice(false);
 	primIdxBuffer->CopyToDevice(false);
 
+	// DELETE LATER
+	shadowOrigins = new float3[SCRWIDTH * SCRHEIGHT];
+	shadowDirections = new float3[SCRWIDTH * SCRHEIGHT];
+	shadowDistances = new float[SCRWIDTH * SCRHEIGHT];
+
+	// Shadow Ray Buffers
+	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowOrigins, 0);
+	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowDirections, 0);
+	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), shadowDistances, 0);
+	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
+	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+
+	shadeKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+		scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,
+		scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s
+		shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer, energyBuffer, pixelIdxBuffer
+		);
+
+	scene.albedoBuffer->CopyToDevice(false);
+	scene.primitiveBuffer->CopyToDevice(false);
+	scene.sphereInvrBuffer->CopyToDevice(false);
+
+
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 	accumulatorBuffer->CopyToDevice(false);
 	deviceBuffer->CopyToDevice(true);
-
 
 	/* Examples
 	deviceBuffer = new Buffer(map.width * map.height, 0, map.bitmap->pixels);
@@ -542,7 +564,7 @@ void Renderer::Tick(float deltaTime)
 				Ray ray = Ray(origins[i], directions[i], distances[i]);
 
 				scene.quads[0].Intersect(ray);
-				scene.cubes[0].Intersect(ray);
+				//scene.cubes[0].Intersect(ray);
 
 				if (scene.useQBVH)
 					scene.bvh->IntersectQBVH(ray);
@@ -558,7 +580,6 @@ void Renderer::Tick(float deltaTime)
 
 			distanceBuffer->CopyToDevice(false);
 			primIdxBuffer->CopyToDevice(true);
-
 
 
 			//finalizeKernel->S(2, (int) accumulatedFrames);

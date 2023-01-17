@@ -103,7 +103,9 @@ namespace Tmpl8 {
     public:
         Sphere() = default;
         Sphere(int idx, float3 p, float r, Material mat) :
-            pos(p), r(r), r2(r* r), invr(1 / r), objIdx(idx), material(mat) {}
+            pos(p), r(r), r2(r* r), invr(1 / r), objIdx(idx), material(mat) {
+            N = GetNormal(float3(0));
+        }
         void Intersect(Ray& ray) const
         {
             float3 oc = ray.O - this->pos;
@@ -137,6 +139,9 @@ namespace Tmpl8 {
         float r = 0, r2 = 0, invr = 0;
         int objIdx = -1;
         Material material;
+        
+        // DELETE LATER
+        float3 N;
     };
 
     // -----------------------------------------------------------
@@ -273,6 +278,11 @@ namespace Tmpl8 {
             objIdx = idx;
             size = s * 0.5f;
             T = transform, invT = transform.FastInvertedTransformNoScale();
+            N = GetNormal(float3(0));
+            c1 = TransformPosition(float3(-size, 0, -size), T);
+            c2 = TransformPosition(float3(size, 0, -size), T);
+            c3 = TransformPosition(float3(size, 0, size), T);
+            A = sqrf(s);
         }
         void Intersect(Ray& ray) const
         {
@@ -299,5 +309,11 @@ namespace Tmpl8 {
         mat4 T, invT;
         int objIdx = -1;
         Material material;
+
+        // DELETE LATER
+        float3 N; 
+
+        float3 c1, c2, c3;
+        float A;
     };
 }

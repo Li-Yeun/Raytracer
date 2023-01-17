@@ -81,7 +81,67 @@ public:
         // hierarchy: virtuals reduce performance somewhat.
 
         std::cout << std::endl << triangles_size << " Triangles loaded" << std::endl << std::endl << std::endl;
+
+        int totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
+
+        primitives = new float3[totalPrimitives];
+        sphereInvrs = new float[spheres_size];
+        albedos = new float3[totalPrimitives];
+
+        for (int i = 0; i < totalPrimitives; i++)
+        {
+            int lowerLimit = 0;
+            int upperLimit = quads_size;
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primitives[i] = quads[i].N;
+                albedos[i] = quads[i].material.color;
+            }
+
+            lowerLimit = upperLimit;
+            upperLimit += spheres_size;
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primitives[i] = spheres[i - lowerLimit].N;
+                sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
+                albedos[i] = spheres[i - lowerLimit].material.color;
+            }
+
+            lowerLimit = upperLimit;
+            upperLimit += cubes_size;
+
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                // TODO CHANGE AND DELETE LATER
+                primitives[i] = float3(0);
+                albedos[i] = float3(0);
+            }
+
+            lowerLimit = upperLimit;
+            upperLimit += planes_size;
+
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primitives[i] = planes[i - lowerLimit].N;
+                albedos[i] = planes[i - lowerLimit].material.color;
+            }
+
+            if (i >= upperLimit)
+            {
+                primitives[i] = triangles[i - upperLimit].N;
+                albedos[i] = triangles[i - upperLimit].material.color;
+            }
+
+        }
+        
+        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float3), primitives , 0);
+        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, 0);
+        albedoBuffer = new Buffer(totalPrimitives * sizeof(float3), albedos, 0);
+
+        float3* lights = new float3[3]{ quads[0].c1, quads[0].c2, quads[0].c3 };
+        lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, 0);
     }
+        
     void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
     {
         std::cout << "Loading: " << inputfile << std::endl;
@@ -442,6 +502,15 @@ public:
 
     // QBVH
     bool useQBVH = true;
+
+    // Primitive Buffers
+    float3* primitives;
+    float* sphereInvrs;
+    float3* albedos;
+    static inline Buffer* primitiveBuffer;
+    static inline Buffer* sphereInvrBuffer;
+    static inline Buffer* albedoBuffer;
+    static inline Buffer* lightBuffer;
 };
 
 }
