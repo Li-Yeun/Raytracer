@@ -316,4 +316,14 @@ namespace Tmpl8 {
         float3 c1, c2, c3;
         float A;
     };
+
+    // TODO convert to openCL struct? (use cl_float3) but gotta figure out how to init a cl_float3 
+    struct Primitive
+    {
+        int type; // 0 = sphere, 1 = triangle, 2 = quad, 3 = plane
+        float3 pos1;
+        float3 pos2 = float3(0);
+        float3 pos3 = float3(0);
+        float infoFloat = 0;
+    };
 }

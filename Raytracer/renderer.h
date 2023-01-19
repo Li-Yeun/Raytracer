@@ -114,6 +114,7 @@ public:
 	static inline Buffer* shadowDistanceBuffer;
 	static inline Buffer* energyBuffer;
 	static inline Buffer* pixelIdxBuffer;
+
 };
 
 } // namespace Tmpl8

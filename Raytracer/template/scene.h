@@ -82,11 +82,12 @@ public:
 
         std::cout << std::endl << triangles_size << " Triangles loaded" << std::endl << std::endl << std::endl;
 
-        int totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
+        totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
 
         primitives = new float3[totalPrimitives];
         sphereInvrs = new float[spheres_size];
         albedos = new float3[totalPrimitives];
+        primitivesInfo = new Primitive[totalPrimitives];
 
         for (int i = 0; i < totalPrimitives; i++)
         {
@@ -96,6 +97,11 @@ public:
             {
                 primitives[i] = quads[i].N;
                 albedos[i] = quads[i].material.color;
+
+                primitivesInfo[i].type = 2;
+                primitivesInfo[i].pos1 = 0;
+                primitivesInfo[i].pos2 = 0;
+                primitivesInfo[i].pos3 = 0;
             }
 
             lowerLimit = upperLimit;
@@ -105,6 +111,12 @@ public:
                 primitives[i] = spheres[i - lowerLimit].N;
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
                 albedos[i] = spheres[i - lowerLimit].material.color;
+
+                primitivesInfo[i].type = 0;
+                primitivesInfo[i].pos1 = spheres[i - lowerLimit].pos;
+                primitivesInfo[i].pos2 = 0;
+                primitivesInfo[i].pos3 = 0;
+                primitivesInfo[i].infoFloat = spheres[i - lowerLimit].r2;
             }
 
             lowerLimit = upperLimit;
@@ -115,6 +127,12 @@ public:
                 // TODO CHANGE AND DELETE LATER
                 primitives[i] = float3(0);
                 albedos[i] = float3(0);
+
+                // TODO CHANGE AND DELETE LATER
+                primitivesInfo[i].type = -1;
+                primitivesInfo[i].pos1 = 0;
+                primitivesInfo[i].pos2 = 0;
+                primitivesInfo[i].pos3 = 0;
             }
 
             lowerLimit = upperLimit;
@@ -124,12 +142,23 @@ public:
             {
                 primitives[i] = planes[i - lowerLimit].N;
                 albedos[i] = planes[i - lowerLimit].material.color;
+
+                primitivesInfo[i].type = 3;
+                primitivesInfo[i].pos1 = planes[i - lowerLimit].N;
+                primitivesInfo[i].pos2 = 0;
+                primitivesInfo[i].pos3 = 0;
+                primitivesInfo[i].infoFloat = planes[i - lowerLimit].d;
             }
 
             if (i >= upperLimit)
             {
                 primitives[i] = triangles[i - upperLimit].N;
                 albedos[i] = triangles[i - upperLimit].material.color;
+
+                primitivesInfo[i].type = 1;
+                primitivesInfo[i].pos1 = triangles[i - upperLimit].pos1;
+                primitivesInfo[i].pos2 = triangles[i - upperLimit].pos2;
+                primitivesInfo[i].pos3 = triangles[i - upperLimit].pos3;
             }
 
         }
@@ -140,6 +169,9 @@ public:
 
         float3* lights = new float3[3]{ quads[0].c1, quads[0].c2, quads[0].c3 };
         lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, 0);
+
+        // Primitive Buffer
+        primitiveInfoBuffer = new Buffer(totalPrimitives * sizeof(Primitive), primitivesInfo);
     }
         
     void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
@@ -483,6 +515,7 @@ public:
     float3 lightColors[2] = {float3(1, 1, 1), float3(0, 0, 0)};
 
     // Primitives
+    int totalPrimitives;
     Quad* quads = 0;
     Sphere* spheres = 0;
     Cube* cubes = 0;
@@ -511,6 +544,11 @@ public:
     static inline Buffer* sphereInvrBuffer;
     static inline Buffer* albedoBuffer;
     static inline Buffer* lightBuffer;
+
+
+    // Primitive info Buffer
+    Primitive* primitivesInfo;
+    static inline Buffer* primitiveInfoBuffer;
 };
 
 }
