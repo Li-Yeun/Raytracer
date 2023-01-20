@@ -55,7 +55,8 @@ void Renderer::Init()
 	shadeKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
 		scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,
 		scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s
-		shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer, energyBuffer, pixelIdxBuffer
+		shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer, energyBuffer, 
+		pixelIdxBuffer
 		);
 
 	scene.albedoBuffer->CopyToDevice(false);
@@ -577,6 +578,9 @@ void Renderer::Tick(float deltaTime)
 				distances[i] = ray.t;
 				primIdxs[i] = ray.objIdx;
 			}
+
+			// Give a random seed (arg 18) to shader kernel
+
 
 			distanceBuffer->CopyToDevice(false);
 			primIdxBuffer->CopyToDevice(true);
