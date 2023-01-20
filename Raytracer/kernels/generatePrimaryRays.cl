@@ -1,8 +1,8 @@
 #define SCRWIDTH 1280
 #define SCRHEIGHT 720
 
-__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, //TODO: Reset E, T 
-__global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, 
+__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, 
+ __global float3 energies, __global float3 transmissions,
 float aspect, float3 camPos)
 {
     int threadId = get_global_id(0);
@@ -25,7 +25,10 @@ float aspect, float3 camPos)
     distances[threadId] = INFINITY;
     primIdxs[threadId] = -1;
 
+    // Reset Buffers to initial values
     pixelIdxs[threadId] = threadId;
+    energies[threadId] = (float3) (0.0f, 0.0f, 0.0f);
+    transmissions[threadId] = (float3) (1.0f, 1.0f, 1.0f);
 }
 
 __kernel void GeneratePrimaryRays(__global int* pixelIdxs, __global int* bouncePixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, 
