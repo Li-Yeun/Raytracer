@@ -2,7 +2,7 @@
 #define SCRHEIGHT 720
 
 __kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, 
- __global float3 energies, __global float3 transmissions,
+ __global float3* energies, __global float3* transmissions,
 float aspect, float3 camPos)
 {
     int threadId = get_global_id(0);

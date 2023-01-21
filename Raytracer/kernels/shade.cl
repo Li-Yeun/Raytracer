@@ -1,29 +1,43 @@
-__global int unlock = 1;
-__global int shadowCounter = -1;
-__global int bounceCounter = -1;
+int localSeed;
 
-float RandomFloat(int seed) { return seed * 2.3283064365387e-10f; }
-
-uint RandomUInt(int seed)
+uint RandomUIntSeed(uint seed)
 {
-    seed ^= seed << 13;
-    seed ^= seed >> 17;
-    seed ^= seed << 5;
-    return seed;
+    localSeed = seed;
+	localSeed ^= seed << 13;
+	localSeed ^= localSeed >> 17;
+	localSeed ^= localSeed << 5;
+	return localSeed;
 }
 
-__kernel void Shade(int threadCounter, __global int* pixelIdxs,
+uint RandomUInt()
+{
+	localSeed ^= localSeed << 13;
+	localSeed ^= localSeed >> 17;
+	localSeed ^= localSeed << 5;
+	return localSeed;
+}
+
+float RandomFloatSeed(uint seed) { return RandomUIntSeed(seed) * 2.3283064365387e-10f; }
+float RandomFloat() { return RandomUInt() * 2.3283064365387e-10f; }
+float Rand(float range) { return RandomFloat() * range; }
+
+float magnitude(float3 v)
+{
+    return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+}
+
+__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs,
 __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs,
 __global float3* albedos, __global float3* primNorms, __global float* sphereInvrs, int sphereStartIdx, int sphereCount,
-__global float3* lightCorners, __global float A, __global float s, __global float3 emission,
-__global float3* energies, __global float3 transmissions,
-__global int* shadowPixelIdxs, __global float3* shadowOrigins, __global float3* shadowDirections, __global float* shadowDistances, 
-__global int* bouncePixelIdxs, __global float3* bounceOrigins, __global float3* bounceDirections,
-__global seed)
+__global float3* lightCorners, float A, float s, float3 emission,
+__global float3* energies, __global float3* transmissions,
+__global int* shadowCounter, __global int* shadowPixelIdxs, __global float3* shadowOrigins, __global float3* shadowDirections, __global float* shadowDistances, 
+__global int* bounceCounter, __global int* bouncePixelIdxs, __global float3* bounceOrigins, __global float3* bounceDirections,
+int seed)
 {   
     int threadId = get_global_id(0);
 
-    if(threadId > threadCounter) // double check if you end with 0 or 1 more than threadID
+    if(threadId > *rayCounter) // double check if you end with 0 or 1 more than threadID
     {
         return;
     }
@@ -34,6 +48,7 @@ __global seed)
 
      // TODO CHECK IF MATERIAL IS LIGHT
 
+    
     float3 I = origins[threadId] + directions[threadId] * distances[threadId];
     float3 N;
 
@@ -49,25 +64,22 @@ __global seed)
 
     // Pick random position
     float3 c1c2 = normalize(lightCorners[0] - lightCorners[1]);
-    uint newSeed = RandomUInt(seed);
-    float randomLength = RandomFloat(newSeed) * s;
+    float randomLength = RandomFloatSeed(seed + threadId * get_local_id(0)) * s;  // Better alternative = RandomFloatSeed(seed + threadId * get_local_id(0) + number0) * s;
     float3 u = c1c2 * randomLength;
 
     float3 c2c3 = normalize(lightCorners[2] - lightCorners[1]);
-    newSeed = RandomUInt(newSeed);
-    randomLength = RandomFloat(newSeed) * s;
+    randomLength = RandomFloat() * s;
     float3 v = c2c3 * randomLength;
 
     float3 light_point = lightCorners[1] + u + v - (float3)(0, 0.01f, 0);
     
     float3 L = light_point - I;
-
-    float dist = sqrt(L[0] * L[0] + L[1] * L[1] + L[2] * L[2])
+    float dist = magnitude(L); // CHECK IF OPENCL DISTANCE DOES THE SAME
 	L = normalize(L);
 
     if (dot(N, L) > 0 && dot(primNorms[0], -L) > 0) {
 
-        int si = atomic_inc(&shadowCounter); // REPLACE WITH A BUFFER COUNTER
+        int si = atomic_inc(shadowCounter);
 
         shadowOrigins[si] = I + L * 0.001f;
         shadowDirections[si] = L;
@@ -83,14 +95,24 @@ __global seed)
     }
     
     // Russian Roulette
-    float p = clamp(max(albedos[primIdxs[threadId]][2], max(albedos[primIdxs[threadId]][0], albedo[primIdxs[threadId]][1])), 0.0f, 1.0f); // TODO CHECK IF DOUBLE INDEX IS VALID
-    newSeed = RandomUInt(newSeed);
+    
+    float p = clamp(max(albedos[primIdxs[threadId]].z, max(albedos[primIdxs[threadId]].x, albedos[primIdxs[threadId]].y)), 0.0f, 1.0f); // TODO CHECK IF DOUBLE INDEX IS VALID
 
-    if (p >= RandomFloat(newSeed)) {
+    if (p >= RandomFloat()) {
         // continue random walk
-        int ei = atomic_inc(&bounceCounter) // REPLACE WITH A BUFFER COUNTER
+        int ei = atomic_inc(bounceCounter);
 
-        float3 R = scene.DiffuseReflection(N);
+        // Calculate a diffuse reflection
+        float3 R = (float3)(Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f);
+
+        while (magnitude(R) > 1.0f)
+        {
+            R = (float3)(Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f);
+        }
+
+        R = normalize(R);
+
+        if (dot(N, R) < 0) R = -R;
 
         bounceOrigins[ei] = I + R * 0.001f;
         bounceDirections[ei] = R;
@@ -99,6 +121,7 @@ __global seed)
 
         float hemiPDF = 1.0f / (M_PI_F * 2.0f);
 
-        transmissions[pixelIdxs[threadId]] *= dot(N, R) / hemiPDF) * BRDF;
+        transmissions[pixelIdxs[threadId]] *= (dot(N, R) / hemiPDF) * BRDF;
     }
+
 }
