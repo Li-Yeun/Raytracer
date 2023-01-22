@@ -1499,6 +1499,16 @@ public:
 		S( 8, i ); S( 9, j ); S( 10, k ); S( 11, l ); S( 12, m ), S( 13, n ); S( 14, o ), S( 15, p );
 		S( 16, q ), S( 17, r ), S( 18, t ), S( 19, u );
 	}
+	
+	template<T_ A, T_ B, T_ C, T_ D, T_ E, T_ F, T_ G, T_ H, T_ I, T_ J, T_ K, T_ L, T_ M, T_ N, T_ O, T_ P, T_ Q, T_ R, T_ T, T_ U, T_ V, T_ W, T_ X, T_ Y, T_ Z, T_ AA>
+	void SetArguments(A a, B b, C c, D d, E e, F f, G g, H h, I i, J j, K k, L l, M m, N n, O o, P p, Q q, R r, T t, U u, V v, W w , X x, Y y, Z z, AA aa)
+	{
+		InitArgs();
+		S(0, a); S(1, b); S(2, c); S(3, d); S(4, e); S(5, f); S(6, g); S(7, h);
+		S(8, i); S(9, j); S(10, k); S(11, l); S(12, m), S(13, n); S(14, o), S(15, p);
+		S(16, q), S(17, r), S(18, t), S(19, u), S(20, v), S(21, w), S(22, x), S(23, y), S(24, z), S(25, aa);
+	}
+
 	template<T_ T> void S( uint i, T t ) { SetArgument( i, t ); }
 	void InitArgs() { acqBuffer = 0; /* nothing to acquire until told otherwise */ }
 #undef T_

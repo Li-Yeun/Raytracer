@@ -507,9 +507,9 @@ public:
     float3* primitives;
     float* sphereInvrs;
     float3* albedos;
+    static inline Buffer* albedoBuffer;
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
-    static inline Buffer* albedoBuffer;
     static inline Buffer* lightBuffer;
 };
 

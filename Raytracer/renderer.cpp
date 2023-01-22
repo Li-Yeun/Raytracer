@@ -10,6 +10,7 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 
 	// Create Kernels
+	generateInitialPrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GenerateInitialPrimaryRays");
 	generatePrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GeneratePrimaryRays");
 	extendKernel = new Kernel("Kernels/extend.cl", "Extend");
 	shadeKernel = new Kernel("Kernels/shade.cl", "Shade");
@@ -21,76 +22,95 @@ void Renderer::Init()
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
 
 	// DELETE LATER
+	rayCounter = new int[1]{ 0 };
+	pixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
 	origins = new float3[SCRWIDTH * SCRHEIGHT];
 	directions = new float3[SCRWIDTH * SCRHEIGHT];
 	distances = new float[SCRWIDTH * SCRHEIGHT];
 	primIdxs = new int[SCRWIDTH * SCRHEIGHT];
 
-	// Ray Buffers
+	// Primary Ray Buffers
+	rayCounterBuffer = new Buffer(1 * sizeof(int), rayCounter, 0);
+	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), pixelIdxs, 0);
 	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), origins, 0);
 	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), directions, 0);
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), distances, 0);
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
 
-	generatePrimaryRaysKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer);
+	// DELETE LATER
+	energies = new float3[SCRWIDTH * SCRHEIGHT];
+
+	// E & T Buffers
+	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), energies, 0);
+	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
 
 	// DELETE LATER
-	originBuffer->CopyToDevice(false);
-	directionBuffer->CopyToDevice(false);
-	distanceBuffer->CopyToDevice(false);
-	primIdxBuffer->CopyToDevice(false);
-
-	// DELETE LATER
+	shadowCounter = new int[1]{ 0 };
+	shadowPixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
 	shadowOrigins = new float3[SCRWIDTH * SCRHEIGHT];
 	shadowDirections = new float3[SCRWIDTH * SCRHEIGHT];
 	shadowDistances = new float[SCRWIDTH * SCRHEIGHT];
 
 	// Shadow Ray Buffers
+	shadowCounterBuffer = new Buffer(1 * sizeof(int), shadowCounter, 0);
+	shadowPixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), shadowPixelIdxs, 0);
 	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowOrigins, 0);
 	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowDirections, 0);
 	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), shadowDistances, 0);
-	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
-	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
-	shadeKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
-		scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,
-		scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s
-		shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer, energyBuffer, 
-		pixelIdxBuffer
+	// DELETE LATER
+	bounceCounter = new int[1]{ 0 };
+
+	// Bounce Ray Buffers
+	bounceCounterBuffer = new Buffer(1 * sizeof(int), bounceCounter, 0);
+	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+	bounceOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
+	bounceDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
+
+	// Set Kernel Arguments
+	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+	energyBuffer, transmissionBuffer,																							 // E & T
+	camera->aspect, camera->camPos); // Check if camera is intialized before this call											 // Camera Properties	
+
+	// DELETE LATER
+	pixelIdxBuffer->CopyToDevice(false);
+	originBuffer->CopyToDevice(false);
+	directionBuffer->CopyToDevice(false);
+	distanceBuffer->CopyToDevice(false);
+	primIdxBuffer->CopyToDevice(false);
+	energyBuffer->CopyToDevice(false);
+
+	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+	bounceCounterBuffer, bouncePixelIdxBuffer,																							    // Bounce Rays
+	shadowCounterBuffer,																													// Shadow Rays
+	camera->aspect, camera->camPos); // Check if camera is intialized before this call							  						    // Camera Properties	
+
+	// DELETE LATER
+	rayCounterBuffer->CopyToDevice(false);
+	bounceCounterBuffer->CopyToDevice(false);
+	shadowCounterBuffer->CopyToDevice(false);
+
+	
+	shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+		scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,			  // Primitives
+		scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
+		energyBuffer, transmissionBuffer,																					  // E & T
+		shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
+		bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer
 		);
 
 	scene.albedoBuffer->CopyToDevice(false);
 	scene.primitiveBuffer->CopyToDevice(false);
 	scene.sphereInvrBuffer->CopyToDevice(false);
-
+	scene.lightBuffer->CopyToDevice(false);
+	shadowPixelIdxBuffer->CopyToDevice(false);
+	shadowOriginBuffer->CopyToDevice(false);
+	shadowDirectionBuffer->CopyToDevice(false);
+	shadowDistanceBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 	accumulatorBuffer->CopyToDevice(false);
 	deviceBuffer->CopyToDevice(true);
-
-	/* Examples
-	deviceBuffer = new Buffer(map.width * map.height, 0, map.bitmap->pixels);
-	tankOldPosBuffer = new Buffer(totalTanks * 2, CL_MEM_READ_ONLY, tankOldPos);
-	*/
-
-	// Initialze Kernels
-
-	/* Example
-	bushDrawKernel->SetArgument(0, deviceBuffer);
-	bushDrawKernel->SetArgument(1, bushSpriteBuffer);
-	bushDrawKernel->SetArgument(2, bushTypeBuffer);
-	*/
-
-
-	// Copy Buffer data from CPU to GPU
-	// bushSpriteBuffer->CopyToDevice(false);
-
-	// Execute 1D and 2D kernels examples
-	//bulletSaveLastPosKernel->Run(maxBullets);
-	//bulletBackupKernel->Run2D(int2(bulletSprite->frameSize * bulletSprite->frameSize, maxBullets), int2(bulletSprite->frameSize, 1));
-
-	// Copy Buffer data from GPU to CPU
-	//deviceBuffer->CopyFromDevice();
 
 }
 
@@ -547,20 +567,33 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
-			generatePrimaryRaysKernel->S(4, camera->aspect);
-			generatePrimaryRaysKernel->S(5, camera->camPos);
+			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
+			generateInitialPrimaryRaysKernel->S(8, camera->camPos);
 
-			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+			generateInitialPrimaryRaysKernel->Run(200 * 200);//Run(SCRWIDTH * SCRHEIGHT);
 
+			pixelIdxBuffer->CopyFromDevice(false);
 			originBuffer->CopyFromDevice(false);
 			directionBuffer->CopyFromDevice(false);
 			distanceBuffer->CopyFromDevice(false);
 			primIdxBuffer->CopyFromDevice(true);
 
-			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
+			/*
+			generatePrimaryRaysKernel->S(9, camera->aspect);
+			generatePrimaryRaysKernel->S(10, camera->camPos);
+
+			generatePrimaryRaysKernel->Run(200 * 200);//Run(SCRWIDTH * SCRHEIGHT);
+
+			pixelIdxBuffer->CopyFromDevice(false);
+			originBuffer->CopyFromDevice(false);
+			directionBuffer->CopyFromDevice(false);
+			distanceBuffer->CopyFromDevice(false);
+			primIdxBuffer->CopyFromDevice(true);
+			*/
+			
+			int counter = 0;
+			for (int i = 0; i < 200 * 200; i++)//for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
 			{
-				if (distances[i] == -1.0f)
-					continue;
 
 				Ray ray = Ray(origins[i], directions[i], distances[i]);
 
@@ -573,24 +606,59 @@ void Renderer::Tick(float deltaTime)
 					scene.bvh->IntersectBVH(ray);
 
 				if (ray.objIdx == -1)
-					ray.t = -1.0f;
+					continue;
 
-				distances[i] = ray.t;
-				primIdxs[i] = ray.objIdx;
+				distances[counter] = ray.t;
+				primIdxs[counter] = ray.objIdx;
+
+				origins[counter] = origins[i];
+				directions[counter] = directions[i];
+				pixelIdxs[counter] = pixelIdxs[i];
+
+
+				counter++;
 			}
 
-			// Give a random seed (arg 18) to shader kernel
-
+			rayCounter[0] = counter;
 
 			distanceBuffer->CopyToDevice(false);
-			primIdxBuffer->CopyToDevice(true);
+			primIdxBuffer->CopyToDevice(false);
+			originBuffer->CopyToDevice(false);
+			directionBuffer->CopyToDevice(false);
+			pixelIdxBuffer->CopyToDevice(false);
 
+			rayCounterBuffer->CopyToDevice(true);
+
+
+			shadeKernel->S(26, (int) RandomUInt()); // Give a random seed to the GPU
+
+			shadeKernel->Run(counter);//Run(SCRWIDTH * SCRHEIGHT);
+
+			bounceCounterBuffer->CopyFromDevice(false);
+
+			shadowCounterBuffer->CopyFromDevice(false);
+			shadowPixelIdxBuffer->CopyFromDevice(false);
+			shadowOriginBuffer->CopyFromDevice(false);
+			shadowDirectionBuffer->CopyFromDevice(false);
+			shadowDistanceBuffer->CopyFromDevice(false);
+
+			energyBuffer->CopyFromDevice(true);
+
+
+			for (int i = 0; i < *shadowCounter; i++) // CHECK IF SHADOWCOUNTER GIVES THE EXACT NUMBER BACK, OR 1 LESS
+			{
+
+			}
+
+
+
+			// Give a random seed (arg 18) to shader kernel
 
 			//finalizeKernel->S(2, (int) accumulatedFrames);
 			//finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			//deviceBuffer->CopyFromDevice();
-
+			
 		}
 		else {
 			accumulatedFrames += 1;

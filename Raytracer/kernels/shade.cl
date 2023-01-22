@@ -26,25 +26,20 @@ float magnitude(float3 v)
     return sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
 }
 
-__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs,
-__global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs,
-__global float3* albedos, __global float3* primNorms, __global float* sphereInvrs, int sphereStartIdx, int sphereCount,
-__global float3* lightCorners, float A, float s, float3 emission,
-__global float3* energies, __global float3* transmissions,
-__global int* shadowCounter, __global int* shadowPixelIdxs, __global float3* shadowOrigins, __global float3* shadowDirections, __global float* shadowDistances, 
-__global int* bounceCounter, __global int* bouncePixelIdxs, __global float3* bounceOrigins, __global float3* bounceDirections,
-int seed)
+__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, // Primary Rays
+__global float3* albedos, __global float3* primNorms, __global float* sphereInvrs, int sphereStartIdx, int sphereCount,                                                          // Primitives
+__global float3* lightCorners, float A, float s, float3 emission,                                                                                                                // Light Source(s)
+__global float3* energies, __global float3* transmissions,                                                                                                                       // E & T
+__global int* shadowCounter, __global int* shadowPixelIdxs, __global float3* shadowOrigins, __global float3* shadowDirections, __global float* shadowDistances,                  // Shadow Rays
+__global int* bounceCounter, __global int* bouncePixelIdxs, __global float3* bounceOrigins, __global float3* bounceDirections,                                                   // Bounce Rays
+int seed)  // Maybe make seed a pointer and atomically increment it after creating a seed                                                                                        // Random CPU seed
 {   
     int threadId = get_global_id(0);
 
-    if(threadId > *rayCounter) // double check if you end with 0 or 1 more than threadID
+    if(threadId >= *rayCounter) // double check if you end with 0 or 1 more than threadID
     {
         return;
     }
-
-    // TODO MIGHT CHANGE LATER
-    if(primIdxs[threadId] == -1)
-        return;
 
      // TODO CHECK IF MATERIAL IS LIGHT
 

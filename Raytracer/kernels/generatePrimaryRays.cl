@@ -1,9 +1,11 @@
-#define SCRWIDTH 1280
-#define SCRHEIGHT 720
+#define SCRWIDTH 200//1280
+#define SCRHEIGHT 200//720
 
-__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, 
- __global float3* energies, __global float3* transmissions,
-float aspect, float3 camPos)
+__global int counter = 0; // Check if this has to be 0 or -1
+
+__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs,  // Primary Rays
+ __global float3* energies, __global float3* transmissions,                                                                                                                  // E & T
+float aspect, float3 camPos)                                                                                                                                                 // Camera Properties
 {
     int threadId = get_global_id(0);
     
@@ -31,11 +33,16 @@ float aspect, float3 camPos)
     transmissions[threadId] = (float3) (1.0f, 1.0f, 1.0f);
 }
 
-__kernel void GeneratePrimaryRays(__global int* pixelIdxs, __global int* bouncePixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, 
-float aspect, float3 camPos)
+__kernel void GeneratePrimaryRays(__global int* rayCounter, __global int* pixelIdxs,  __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, // Primary Rays
+__global int* bounceCounter, __global int* bouncePixelIdxs,                                                                                                                                     // Bounce Rays
+__global int* shadowCounter,                                                                                                                                                                    // Shadow Rays
+float aspect, float3 camPos)                                                                                                                                                                    // Camera Properties
 {
     int threadId = get_global_id(0);
     
+    if(threadId > *bounceCounter) // CHECK IF IT MUST BE BIGGER > or >=
+        return;
+
     // TODO CHANGE AND DELETE
     if(distances[threadId] == -1.0f)
         return;
@@ -59,4 +66,14 @@ float aspect, float3 camPos)
     primIdxs[threadId] = -1;
 
     pixelIdxs[threadId] = bouncePixelIdxs[threadId];
+
+    int ri = atomic_inc(&counter);
+
+    if(ri == *bounceCounter) // check if this is correct
+    {
+        atomic_xchg(&counter, 0);
+        atomic_xchg(rayCounter, *bounceCounter);
+        atomic_xchg(bounceCounter, 0);
+        atomic_xchg(shadowCounter, 0);
+    }
 }

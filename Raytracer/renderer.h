@@ -81,6 +81,7 @@ public:
 	}
 
 	//Kernels
+	static inline Kernel* generateInitialPrimaryRaysKernel;
 	static inline Kernel* generatePrimaryRaysKernel;
 	static inline Kernel* extendKernel;
 	static inline Kernel* shadeKernel;
@@ -96,24 +97,43 @@ public:
 	// DELETE LATER
 	float3* origins, *directions;
 	float* distances;
-	int* primIdxs;
+	int* primIdxs, *rayCounter, *pixelIdxs;
 
 	// Ray Buffers
+	static inline Buffer* rayCounterBuffer;
+	static inline Buffer* pixelIdxBuffer;
 	static inline Buffer* originBuffer;
 	static inline Buffer* directionBuffer;
 	static inline Buffer* distanceBuffer;
 	static inline Buffer* primIdxBuffer;
 
 	// DELETE LATER
+	float3* energies;
+
+	// E & T
+	static inline Buffer* energyBuffer;
+	static inline Buffer* transmissionBuffer;
+
+	// DELETE LATER
 	float3* shadowOrigins, *shadowDirections;
 	float* shadowDistances;
+	int* shadowCounter, *shadowPixelIdxs;
 
 	// Shadow Ray Buffers
+	static inline Buffer* shadowCounterBuffer;
+	static inline Buffer* shadowPixelIdxBuffer;
 	static inline Buffer* shadowOriginBuffer;
 	static inline Buffer* shadowDirectionBuffer;
 	static inline Buffer* shadowDistanceBuffer;
-	static inline Buffer* energyBuffer;
-	static inline Buffer* pixelIdxBuffer;
+
+	// DELETE LATER
+	int* bounceCounter;
+
+	// Bounce Ray Buffers
+	static inline Buffer* bounceCounterBuffer;
+	static inline Buffer* bouncePixelIdxBuffer;
+	static inline Buffer* bounceOriginBuffer;
+	static inline Buffer* bounceDirectionBuffer;
 };
 
 } // namespace Tmpl8
