@@ -108,7 +108,7 @@ public:
 	static inline Buffer* primIdxBuffer;
 
 	// DELETE LATER
-	float3* energies;
+	float3* energies, *transmissions;
 
 	// E & T
 	static inline Buffer* energyBuffer;

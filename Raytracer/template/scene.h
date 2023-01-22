@@ -140,6 +140,8 @@ public:
 
         float3* lights = new float3[3]{ quads[0].c1, quads[0].c2, quads[0].c3 };
         lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, 0);
+        
+        isInitialized = true;
     }
         
     void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
@@ -511,6 +513,9 @@ public:
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
     static inline Buffer* lightBuffer;
+
+    // Check if scene has been fully initialzed
+    bool isInitialized = false;
 };
 
 }

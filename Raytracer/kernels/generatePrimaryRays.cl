@@ -1,5 +1,5 @@
-#define SCRWIDTH 200//1280
-#define SCRHEIGHT 200//720
+#define SCRWIDTH 100//1280
+#define SCRHEIGHT 100//720
 
 __global int counter = 0; // Check if this has to be 0 or -1
 
@@ -40,11 +40,7 @@ float aspect, float3 camPos)                                                    
 {
     int threadId = get_global_id(0);
     
-    if(threadId > *bounceCounter) // CHECK IF IT MUST BE BIGGER > or >=
-        return;
-
-    // TODO CHANGE AND DELETE
-    if(distances[threadId] == -1.0f)
+    if(threadId >= *bounceCounter) 
         return;
     
     int x = threadId / SCRWIDTH;
@@ -69,7 +65,7 @@ float aspect, float3 camPos)                                                    
 
     int ri = atomic_inc(&counter);
 
-    if(ri == *bounceCounter) // check if this is correct
+    if(ri == *bounceCounter - 1) 
     {
         atomic_xchg(&counter, 0);
         atomic_xchg(rayCounter, *bounceCounter);

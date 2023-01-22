@@ -36,12 +36,12 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
 {   
     int threadId = get_global_id(0);
 
-    if(threadId >= *rayCounter) // double check if you end with 0 or 1 more than threadID
+    if(threadId >= *rayCounter - 1)
     {
         return;
     }
 
-     // TODO CHECK IF MATERIAL IS LIGHT
+     // TODO CHECK IF MATERIAL IS LIGHT (PROBABLY DO THIS IN EXTEND KERNEL ALREADY)
 
     
     float3 I = origins[threadId] + directions[threadId] * distances[threadId];
@@ -91,8 +91,9 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
     
     // Russian Roulette
     
-    float p = clamp(max(albedos[primIdxs[threadId]].z, max(albedos[primIdxs[threadId]].x, albedos[primIdxs[threadId]].y)), 0.0f, 1.0f); // TODO CHECK IF DOUBLE INDEX IS VALID
-
+    float p = clamp(max(albedos[primIdxs[threadId]].z, max(albedos[primIdxs[threadId]].x, albedos[primIdxs[threadId]].y)), 0.0f, 1.0f);
+    //printf("float: %f", p);
+    p = RandomFloat();     
     if (p >= RandomFloat()) {
         // continue random walk
         int ei = atomic_inc(bounceCounter);
@@ -117,6 +118,7 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
         float hemiPDF = 1.0f / (M_PI_F * 2.0f);
 
         transmissions[pixelIdxs[threadId]] *= (dot(N, R) / hemiPDF) * BRDF;
+        
     }
 
 }
