@@ -8,6 +8,23 @@ typedef struct
 
 } Primitive ;
 
+// TODO: check this function (it's generated), pass invT from quad to Extend kernel (how to we convert matrix to float pointer, i assume just 16 floats) 
+// Multiply a 4x4 matrix by a 4x1 vector
+float* MultiplyMatrix(float4 a, float* matrix)  
+{
+    float4 result = (float4)(0, 0, 0, 0);
+    for (int i = 0; i < 4; i++)
+    {
+        result.x += a[i] * matrix[i];
+        result.y += a[i] * matrix[i + 4];
+        result.z += a[i] * matrix[i + 8];
+        result.w += a[i] * matrix[i + 12];
+    }
+    return (float*)result;
+}
+
+
+// TODO: add buffer for invT matrix for quads (unless we can add them to the primitive struct)
 __kernel void Extend(__global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, __global Primitive* primitives, int primCount)
 {   
     int i = get_global_id(0);
@@ -62,8 +79,23 @@ __kernel void Extend(__global float3* origins, __global float3* directions, __gl
 
         if (type == 2) // quad
         {
-            //TODO: implement
+            //TODO: check if functions correctly
 
+            // const float3 O = TransformPosition(ray.O, invT);
+            const float4 O4 = (float4)(ray.O, 1);
+            const float3 O = (float3)(MultiplyMatrix(O4, invT));
+
+            // const float3 D = TransformVector(ray.D, invT);
+            const float4 D4 = (float4)(ray.D, 0);
+            const float3 D = (float3)(MultiplyMatrix(D4, invT));
+
+            const float t = O.y / -D.y;
+            if (t < ray.t && t > 0)
+            {
+                float3 I = O + t * D;
+                if (I.x > -size && I.x < size && I.z > -size && I.z < size)
+                    ray.t = t, ray.objIdx = objIdx;
+            }
         }
 
         if (type == 3) // plane
