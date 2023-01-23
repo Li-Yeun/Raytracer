@@ -738,7 +738,7 @@ void Renderer::Tick(float deltaTime)
 					counter++;
 				}
 				if (counter == 0)
-					return;
+					break;
 
 				rayCounter[0] = counter;
 
