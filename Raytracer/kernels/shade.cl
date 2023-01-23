@@ -91,7 +91,7 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
     
     // Russian Roulette
     
-    float p = clamp(max(albedos[primIdxs[threadId]].z, max(albedos[primIdxs[threadId]].x, albedos[primIdxs[threadId]].y)), 0.0f, 0.9f); // TODO CHANGE 0.9f to 1.0f
+    float p = clamp(max(albedos[primIdxs[threadId]].z, max(albedos[primIdxs[threadId]].x, albedos[primIdxs[threadId]].y)), 0.0f, 1.0f);
     //printf("float: %f", p);
     if (p >= RandomFloat()) {
         // continue random walk

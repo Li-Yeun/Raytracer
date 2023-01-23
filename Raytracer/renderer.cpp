@@ -82,10 +82,8 @@ void Renderer::Init()
 	transmissionBuffer->CopyToDevice(false);
 
 	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
-	bounceCounterBuffer, bouncePixelIdxBuffer,																							    // Bounce Rays
-	shadowCounterBuffer,																													// Shadow Rays
-	camera->aspect, camera->camPos); // Check if camera is intialized before this call							  						    // Camera Properties	
-
+		shadowCounterBuffer,																												// Shadow Rays	
+		bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer);											    // Bounce Rays  
 	// DELETE LATER
 	rayCounterBuffer->CopyToDevice(false);
 	bounceCounterBuffer->CopyToDevice(false);
@@ -543,11 +541,12 @@ void Renderer::Tick(float deltaTime)
 	if (!scene.isInitialized)
 		return;
 
+	/*
 	std::cout << sizeof(float3) * scene.triangles_size << std::endl;
 	std::cout << CL_DEVICE_MAX_MEM_ALLOC_SIZE << std::endl;
 	std::cout << CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE << std::endl;
 	std::cout << CL_DEVICE_GLOBAL_MEM_SIZE << std::endl;
-
+	*/
 
 	static bool firstTick = true;
 
@@ -587,9 +586,6 @@ void Renderer::Tick(float deltaTime)
 
 			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
 			generateInitialPrimaryRaysKernel->S(8, camera->camPos);
-
-			generatePrimaryRaysKernel->S(9, camera->aspect);
-			generatePrimaryRaysKernel->S(10, camera->camPos);
 
 			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 

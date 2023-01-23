@@ -9,8 +9,8 @@ float aspect, float3 camPos)                                                    
 {
     int threadId = get_global_id(0);
     
-    int x = threadId / SCRWIDTH;
-    int y = threadId % SCRWIDTH;
+    int x = threadId % SCRWIDTH;
+    int y = threadId / SCRWIDTH;
 
     float u = (float)x * (1.0f / SCRWIDTH);
 	float v = (float)y * (1.0f / SCRHEIGHT);
@@ -34,29 +34,16 @@ float aspect, float3 camPos)                                                    
 }
 
 __kernel void GeneratePrimaryRays(__global int* rayCounter, __global int* pixelIdxs,  __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, // Primary Rays
-__global int* bounceCounter, __global int* bouncePixelIdxs,                                                                                                                                     // Bounce Rays
-__global int* shadowCounter,                                                                                                                                                                    // Shadow Rays
-float aspect, float3 camPos)                                                                                                                                                                    // Camera Properties
+__global int* shadowCounter,                                                                                                                                                                    // Shadow Rays  
+__global int* bounceCounter, __global int* bouncePixelIdxs, __global float3* bounceOrigins, __global float3* bounceDirections)                                                                  // Bounce Rays                                                                                                                                                                  // Camera Properties
 {
     int threadId = get_global_id(0);
     
     if(threadId >= *bounceCounter) 
         return;
-    
-    int x = threadId / SCRWIDTH;
-    int y = threadId % SCRWIDTH;
 
-    float u = (float)x * (1.0f / SCRWIDTH);
-	float v = (float)y * (1.0f / SCRHEIGHT);
-    
-    float3 topLeft = (float3) ( -aspect, 1.0f, 0.0f );
-	float3 topRight = (float3)( aspect, 1.0f, 0.0f );
-	float3 bottomLeft = (float3) ( -aspect, -1.0f, 0.0f );
-
-    float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
-
-    origins[threadId] = camPos;
-    directions[threadId] = normalize(P - camPos);
+    origins[threadId] = bounceOrigins[threadId];
+    directions[threadId] = bounceDirections[threadId];
 
     distances[threadId] = INFINITY;
     primIdxs[threadId] = -1;
