@@ -673,10 +673,7 @@ void Renderer::Tick(float deltaTime)
 				Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
 				if (!scene.IsOccluded(ray))
 				{
-					//std::cout << shadowPixelIdxs[i] << std::endl;
-					float3 energy = energies[shadowPixelIdxs[i]];
-
-					accumulator[shadowPixelIdxs[i]] += float4(energy, 0);
+					accumulator[shadowPixelIdxs[i]] += float4(energies[i], 0);
 				}
 			}
 
@@ -773,8 +770,7 @@ void Renderer::Tick(float deltaTime)
 					Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
 					if (!scene.IsOccluded(ray))
 					{
-						float3 energy = energies[shadowPixelIdxs[i]];
-						accumulator[shadowPixelIdxs[i]] += float4(energy, 0);
+						accumulator[shadowPixelIdxs[i]] += float4(energies[i], 0);
 					}
 				}
 
