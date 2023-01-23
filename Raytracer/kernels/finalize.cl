@@ -1,6 +1,3 @@
-#define SCRWIDTH 1280
-#define SCRHEIGHT 720
-
 uint RGBF32_to_RGB8( float4 v, int f )
 {
 	uint r = (uint)(255.0f * min( 1.0f, v.x / f));

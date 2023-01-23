@@ -591,7 +591,6 @@ public:
 			if (parentNode.child[i] == -1) return;
 			if (intersect.m128_i32[i] == 0) continue;
 
-			//if (!IntersectAABB(ray, float3(parentNode.bminx[i], parentNode.bminy[i], parentNode.bminz[i]), float3(parentNode.bmaxx[i], parentNode.bmaxy[i], parentNode.bmaxz[i]))) continue;
 
 			if (parentNode.count[i] > 0)
 			{

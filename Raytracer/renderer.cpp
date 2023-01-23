@@ -91,24 +91,6 @@ void Renderer::Init()
 	bounceCounterBuffer->CopyToDevice(false);
 	shadowCounterBuffer->CopyToDevice(false);
 
-	
-	shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
-		scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,			  // Primitives
-		scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
-		energyBuffer, transmissionBuffer,																					  // E & T
-		shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
-		bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer
-		);
-
-	scene.albedoBuffer->CopyToDevice(false);
-	scene.primitiveBuffer->CopyToDevice(false);
-	scene.sphereInvrBuffer->CopyToDevice(false);
-	scene.lightBuffer->CopyToDevice(false);
-
-	shadowPixelIdxBuffer->CopyToDevice(false);
-	shadowOriginBuffer->CopyToDevice(false);
-	shadowDirectionBuffer->CopyToDevice(false);
-	shadowDistanceBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 
@@ -561,8 +543,36 @@ void Renderer::Tick(float deltaTime)
 	if (!scene.isInitialized)
 		return;
 
+	std::cout << sizeof(float3) * scene.triangles_size << std::endl;
+	std::cout << CL_DEVICE_MAX_MEM_ALLOC_SIZE << std::endl;
+	std::cout << CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE << std::endl;
+	std::cout << CL_DEVICE_GLOBAL_MEM_SIZE << std::endl;
+
+
 	static bool firstTick = true;
 
+	if (firstTick)
+	{
+		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+			scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,			  // Primitives
+			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
+			energyBuffer, transmissionBuffer,																					  // E & T
+			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
+			bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer
+		);
+
+		scene.albedoBuffer->CopyToDevice(false);
+		scene.primitiveBuffer->CopyToDevice(false);
+		scene.sphereInvrBuffer->CopyToDevice(false);
+		scene.lightBuffer->CopyToDevice(false);
+
+		shadowPixelIdxBuffer->CopyToDevice(false);
+		shadowOriginBuffer->CopyToDevice(false);
+		shadowDirectionBuffer->CopyToDevice(false);
+		shadowDistanceBuffer->CopyToDevice(true);
+
+		firstTick = false;
+	}
 	// animation
 	static float animTime = 0;
 	scene.SetTime(animTime += deltaTime * 0.002f);
@@ -581,19 +591,17 @@ void Renderer::Tick(float deltaTime)
 			generatePrimaryRaysKernel->S(9, camera->aspect);
 			generatePrimaryRaysKernel->S(10, camera->camPos);
 
-			generateInitialPrimaryRaysKernel->Run(200 * 200);//Run(SCRWIDTH * SCRHEIGHT);
+			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			pixelIdxBuffer->CopyFromDevice(false);
 			originBuffer->CopyFromDevice(false);
 			directionBuffer->CopyFromDevice(false);
-			distanceBuffer->CopyFromDevice(false);
 			primIdxBuffer->CopyFromDevice(true);
 			
 			int counter = 0;
 			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
 			{
-
-				Ray ray = Ray(origins[i], directions[i], distances[i]);
+				Ray ray = Ray(origins[i], directions[i]);
 
 				scene.quads[0].Intersect(ray);
 				//scene.cubes[0].Intersect(ray);
@@ -644,16 +652,6 @@ void Renderer::Tick(float deltaTime)
 
 			rayCounterBuffer->CopyToDevice(true);
 
-			if (firstTick)
-			{
-
-				scene.albedoBuffer->CopyToDevice(false);
-				scene.primitiveBuffer->CopyToDevice(false);
-				scene.sphereInvrBuffer->CopyToDevice(false);
-				scene.lightBuffer->CopyToDevice(true);
-
-				firstTick = false;
-			}
 			shadeKernel->S(26, (int) RandomUInt()); // Give a random seed to the GPU
 
 			shadeKernel->Run(counter);
@@ -668,28 +666,29 @@ void Renderer::Tick(float deltaTime)
 
 			energyBuffer->CopyFromDevice(true);
 
-			/*
+			
 			std::cout <<  "InitialShadowCounter:" << shadowCounter[0] << std::endl;
 			for (int i = 0; i < shadowCounter[0]; i++)
 			{
 				Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
 				if (!scene.IsOccluded(ray))
 				{
-					std::cout << shadowPixelIdxs[i] << std::endl;
+					//std::cout << shadowPixelIdxs[i] << std::endl;
 					float3 energy = energies[shadowPixelIdxs[i]];
 
 					accumulator[shadowPixelIdxs[i]] += float4(energy, 0);
 				}
-			}*/
+			}
 
 			accumulatorBuffer->CopyToDevice(true);
-			//std::cout << "InitialbounceCounter: " << bounceCounter[0] << std::endl;
+			std::cout << "InitialbounceCounter: " << bounceCounter[0] << std::endl;
 
 			int loop = 0;
 			while (bounceCounter[0] > 0)
 			{
 				loop++;
-				//printf("bounceCounter", bounceCounter[0]);
+				//std::cout << "bounceCounter: " << bounceCounter[0] << std::endl;
+
 				generatePrimaryRaysKernel->Run(bounceCounter[0]);
 
 				pixelIdxBuffer->CopyFromDevice(false);
@@ -768,7 +767,7 @@ void Renderer::Tick(float deltaTime)
 				energyBuffer->CopyFromDevice(true);
 
 	
-				/*
+				
 				for (int i = 0; i < shadowCounter[0]; i++)
 				{
 					Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
@@ -780,19 +779,14 @@ void Renderer::Tick(float deltaTime)
 				}
 
 				accumulatorBuffer->CopyToDevice(true);
-				*/
+				
 			}
 			std::cout << "loop count:" << loop << std::endl;
 
+			finalizeKernel->S(2, (int) accumulatedFrames);
+			finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-
-
-			// Give a random seed (arg 18) to shader kernel
-
-			//finalizeKernel->S(2, (int) accumulatedFrames);
-			//finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
-
-			//deviceBuffer->CopyFromDevice();
+			deviceBuffer->CopyFromDevice();
 			
 		}
 		else {

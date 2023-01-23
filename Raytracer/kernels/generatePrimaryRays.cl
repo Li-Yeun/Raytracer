@@ -1,5 +1,5 @@
-#define SCRWIDTH 100//1280
-#define SCRHEIGHT 100//720
+#define SCRWIDTH 200//1280
+#define SCRHEIGHT 200//720
 
 __global int counter = 0; // Check if this has to be 0 or -1
 

@@ -134,13 +134,13 @@ public:
 
         }
         
-        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float3), primitives , 0);
-        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, 0);
-        albedoBuffer = new Buffer(totalPrimitives * sizeof(float3), albedos, 0);
+        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float3), primitives , CL_MEM_READ_ONLY);
+        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, CL_MEM_READ_ONLY);
+        albedoBuffer = new Buffer(totalPrimitives * sizeof(float3), albedos, CL_MEM_READ_ONLY);
 
         float3* lights = new float3[3]{ quads[0].c1, quads[0].c2, quads[0].c3 };
-        lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, 0);
-        
+        lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, CL_MEM_READ_ONLY);
+
         isInitialized = true;
     }
         
