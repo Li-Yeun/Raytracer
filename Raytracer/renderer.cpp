@@ -716,7 +716,7 @@ void Renderer::Tick(float deltaTime)
 				for (int i = 0; i < rayCounter[0]; i++)
 				{
 
-					Ray ray = Ray(origins[i], directions[i], distances[i]);
+					Ray ray = Ray(origins[i], directions[i]);
 
 					scene.quads[0].Intersect(ray);
 					//scene.cubes[0].Intersect(ray);
