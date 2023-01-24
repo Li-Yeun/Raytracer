@@ -24,6 +24,8 @@ __kernel void Extend(__global float3* origins, __global float3* directions, __gl
                     int primCount, __global int* primTypes, //Primitive metadata
                     __global float3* primInfo1, __global float3* primInfo2, __global float3* primInfo3, // Primitive float3 data
                     __global float* primInfofloat, __global float16* primInfoMatrix) // primitive misc data
+                    
+                    //__global float3* aabbMin, __global float3* aabbMax, __global uint* leftFirst, __global uint* primitiveCount) // BVH data 
 {   
     int i = get_global_id(0);
 
