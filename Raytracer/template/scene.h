@@ -40,8 +40,8 @@ public:
     Scene()
     {
         def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
-        red_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0, 0);
-        cyan_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0, 0);
+        red_mat = Material(Material::MaterialType::DIFFUSE, float3(0.93f, 0.21f, 0.21f), 0);
+        cyan_mat = Material(Material::MaterialType::DIFFUSE, float3(0.11f, 0.95f, 0.91f), 0);
         mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
         absorb_all_but_blue_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 1.0f));
         glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
