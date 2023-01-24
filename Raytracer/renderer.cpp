@@ -5,6 +5,7 @@
 // -----------------------------------------------------------
 void Renderer::Init()
 {
+	std::cout << sizeof(mat4) << std::endl;
 	// create fp32 rgb pixel buffer to render to
 	accumulator = (float4*)MALLOC64( SCRWIDTH * SCRHEIGHT * 16 );
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
@@ -23,11 +24,11 @@ void Renderer::Init()
 
 	// DELETE LATER
 	rayCounter = new int[1]{ 0 };
-	pixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
-	origins = new float3[SCRWIDTH * SCRHEIGHT];
-	directions = new float3[SCRWIDTH * SCRHEIGHT];
-	distances = new float[SCRWIDTH * SCRHEIGHT];
-	primIdxs = new int[SCRWIDTH * SCRHEIGHT];
+	pixelIdxs = new int[SCRWIDTH * SCRHEIGHT]{ 0 };
+	origins = new float3[SCRWIDTH * SCRHEIGHT]{ float3(0) };
+	directions = new float3[SCRWIDTH * SCRHEIGHT]{ float3(0) };;
+	distances = new float[SCRWIDTH * SCRHEIGHT]{ 0 };
+	primIdxs = new int[SCRWIDTH * SCRHEIGHT]{ 0 };
 
 	// Primary Ray Buffers
 	rayCounterBuffer = new Buffer(1 * sizeof(int), rayCounter, 0);
@@ -38,18 +39,18 @@ void Renderer::Init()
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
 
 	// DELETE LATER
-	energies = new float3[SCRWIDTH * SCRHEIGHT];
-	transmissions = new float3[SCRWIDTH * SCRHEIGHT];
+	energies = new float3[SCRWIDTH * SCRHEIGHT]{ float3(0) };
+	transmissions = new float3[SCRWIDTH * SCRHEIGHT]{ float3(1) };
 	// E & T Buffers
 	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), energies, 0);
 	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), transmissions, 0);
 
 	// DELETE LATER
 	shadowCounter = new int[1]{ 0 };
-	shadowPixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
-	shadowOrigins = new float3[SCRWIDTH * SCRHEIGHT];
-	shadowDirections = new float3[SCRWIDTH * SCRHEIGHT];
-	shadowDistances = new float[SCRWIDTH * SCRHEIGHT];
+	shadowPixelIdxs = new int[SCRWIDTH * SCRHEIGHT]{ 0 };
+	shadowOrigins = new float3[SCRWIDTH * SCRHEIGHT]{float3(0)};
+	shadowDirections = new float3[SCRWIDTH * SCRHEIGHT]{float3(0)};
+	shadowDistances = new float[SCRWIDTH * SCRHEIGHT]{0};
 
 	// Shadow Ray Buffers
 	shadowCounterBuffer = new Buffer(1 * sizeof(int), shadowCounter, 0);
@@ -63,20 +64,19 @@ void Renderer::Init()
 
 	// Bounce Ray Buffers
 	bounceCounterBuffer = new Buffer(1 * sizeof(int), bounceCounter, 0);
-	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
-	bounceOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
-	bounceDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
+	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));  // Check
+	bounceOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3)); // Check
+	bounceDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3)); // Check
 
 	// Set Kernel Arguments
 	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
-	energyBuffer, transmissionBuffer,																							 // E & T
-	camera->aspect, camera->camPos); // Check if camera is intialized before this call											 // Camera Properties	
+	energyBuffer, transmissionBuffer);																							 // E & T
 
 	// DELETE LATER
 	pixelIdxBuffer->CopyToDevice(false);
 	originBuffer->CopyToDevice(false);
 	directionBuffer->CopyToDevice(false);
-	distanceBuffer->CopyToDevice(false);
+	distanceBuffer->CopyToDevice(false);	
 	primIdxBuffer->CopyToDevice(false);
 	energyBuffer->CopyToDevice(false);
 	transmissionBuffer->CopyToDevice(false);
@@ -86,10 +86,14 @@ void Renderer::Init()
 		bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer);											    // Bounce Rays  
 	// DELETE LATER
 	rayCounterBuffer->CopyToDevice(false);
-	bounceCounterBuffer->CopyToDevice(false);
 	shadowCounterBuffer->CopyToDevice(false);
+	bounceCounterBuffer->CopyToDevice(false);
 
-
+	/*
+	bouncePixelIdxBuffer->CopyToDevice(false);
+	bounceOriginBuffer->CopyToDevice(false);
+	bounceDirectionBuffer->CopyToDevice(false);
+	*/
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 
 	accumulatorBuffer->CopyToDevice(false);
@@ -558,7 +562,7 @@ void Renderer::Tick(float deltaTime)
 	{
 		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
 			scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,			  // Primitives
-			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission, // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
+			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission,							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
 			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
 			bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer
@@ -598,7 +602,7 @@ void Renderer::Tick(float deltaTime)
 			directionBuffer->CopyFromDevice(false);
 			distanceBuffer->CopyFromDevice(false);
 			primIdxBuffer->CopyFromDevice(true);
-			
+			clFinish(Kernel::GetQueue());
 			int counter = 0;
 			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
 			{
@@ -623,6 +627,7 @@ void Renderer::Tick(float deltaTime)
 
 					break;
 				}*/
+
 				Material material = scene.GetMaterial(ray.objIdx);
 				if (material.type == Material::MaterialType::LIGHT)
 				{
@@ -667,12 +672,22 @@ void Renderer::Tick(float deltaTime)
 
 			energyBuffer->CopyFromDevice(true);
 
-			
+			clFinish(Kernel::GetQueue());
 			std::cout <<  "InitialShadowCounter:" << shadowCounter[0] << std::endl;
 			for (int i = 0; i < shadowCounter[0]; i++)
 			{
 				Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
-				if (!scene.IsOccluded(ray))
+
+				scene.quads[0].Intersect(ray);
+				//scene.cubes[0].Intersect(ray);
+
+				bool isOccluded;
+				if (scene.useQBVH)
+					isOccluded = scene.bvh->IntersectQBVHShadowRay(ray, ray.objIdx != -1);
+				else
+					isOccluded = scene.bvh->IntersectBVHShadowRay(ray, ray.objIdx != -1);
+
+				if (!isOccluded)
 				{
 					accumulator[shadowPixelIdxs[i]] += float4(energies[i], 0);
 				}
@@ -696,7 +711,7 @@ void Renderer::Tick(float deltaTime)
 				primIdxBuffer->CopyFromDevice(false);
 
 				rayCounterBuffer->CopyFromDevice(true);
-
+				clFinish(Kernel::GetQueue());
 				int counter = 0;
 				for (int i = 0; i < rayCounter[0]; i++)
 				{
@@ -763,13 +778,22 @@ void Renderer::Tick(float deltaTime)
 				shadowDistanceBuffer->CopyFromDevice(false);
 
 				energyBuffer->CopyFromDevice(true);
+				clFinish(Kernel::GetQueue());
 
-	
-				
 				for (int i = 0; i < shadowCounter[0]; i++)
 				{
 					Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
-					if (!scene.IsOccluded(ray))
+
+					scene.quads[0].Intersect(ray);
+					//scene.cubes[0].Intersect(ray);
+
+					bool isOccluded;
+					if (scene.useQBVH)
+						isOccluded = scene.bvh->IntersectQBVHShadowRay(ray, ray.objIdx != -1);
+					else
+						isOccluded = scene.bvh->IntersectBVHShadowRay(ray, ray.objIdx != -1);
+
+					if (!isOccluded)
 					{
 						accumulator[shadowPixelIdxs[i]] += float4(energies[i], 0);
 					}
@@ -780,11 +804,23 @@ void Renderer::Tick(float deltaTime)
 			}
 			std::cout << "loop count:" << loop << std::endl;
 
+			/*
+			int co = 0;
+			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
+			{
+				if (magnitude(accumulator[i]) == 0)
+				{
+					co++;
+					std::cout << "pixel: " << i << std::endl;
+				}
+			}
+			std::cout << "totalpixel: " << co << std::endl;
+			*/
 			finalizeKernel->S(2, (int) accumulatedFrames);
 			finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			deviceBuffer->CopyFromDevice();
-			
+			clFinish(Kernel::GetQueue());
 		}
 		else {
 			accumulatedFrames += 1;

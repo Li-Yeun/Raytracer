@@ -40,24 +40,30 @@ public:
     Scene()
     {
         def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
-        red_mat = Material(Material::MaterialType::DIFFUSE, float3(0.93f, 0.21f, 0.21f), 0);
-        cyan_mat = Material(Material::MaterialType::DIFFUSE, float3(0.11f, 0.95f, 0.91f), 0);
+        red_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0, 0);
+        cyan_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0, 0);
         mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
         absorb_all_but_blue_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 1.0f));
         glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
         light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(2.0f));
 
 
+        mat4 M1base = mat4::Translate(float3(0, 2.6f, 2));
+        mat4 M1 = M1base * mat4::RotateZ(sinf(0 * 0.6f) * 0.1f) * mat4::Translate(float3(0, -0.9, 0));
+
+        mat4 M2base = mat4::RotateX(PI / 4) * mat4::RotateZ(PI / 4);
+        mat4 M2 = mat4::Translate(float3(1.4f, 0, 2)) * mat4::RotateY(0 * 0.5f) * M2base;
+
         quads_size = 1;
-        quads = new Quad[quads_size] { Quad(id++, 3, light_mat) };                              // 0: light source
-                  
+        quads = new Quad[quads_size] { Quad(id++, 3, light_mat, M1) };                              // 0: light source
+
         spheres_size = 2;
         spheres = new Sphere[spheres_size]{ 
             Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, absorb_all_but_blue_mat),                             // 1: bouncing ball
             Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners		
 
         cubes_size = 1;
-        cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(0.75f), def_mat) };         // 3: cube
+        cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(0.75f), def_mat, M2) };         // 3: cube
                
         planes_size = 6;                                                                                                
         planes = new Plane[planes_size]{
@@ -71,9 +77,9 @@ public:
 
         std::cout << "Loading objects ..." << std::endl;
 
-        LoadObject("assets/monkey.obj", glass_mat, float3(0, 0, 1.5));
-        LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
-        LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
+        LoadObject("assets/pyramid.obj", glass_mat, float3(0, 0, 1.5));
+        //LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
+        //LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
 
         bvh = new BVH(spheres, spheres_size, planes, planes_size, triangles, triangles_size);
         SetTime( 0 );
@@ -216,6 +222,7 @@ public:
     }
     void SetTime( float t )
     {
+        return;
         // default time for the scene is simply 0. Updating/ the time per frame
         // enables animation. Updating it per ray can be used for motion blur.
         animTime = 0;
@@ -223,6 +230,7 @@ public:
         
 
         if (isDynamic) animTime = t;
+
         // light source animation: swing
         mat4 M1base = mat4::Translate( float3( 0, 2.6f, 2 ) );
         mat4 M1 = M1base * mat4::RotateZ( sinf( animTime * 0.6f ) * 0.1f ) * mat4::Translate( float3( 0, -0.9, 0 ) );

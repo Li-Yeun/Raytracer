@@ -116,7 +116,7 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
         bounceDirections[ei] = R;
 
         bouncePixelIdxs[ei] = pixelIdxs[threadId];
-        
+                
         transmissions[pixelIdxs[threadId]] *= (dot(N, R) / hemiPDF) * BRDF;
     }
 
