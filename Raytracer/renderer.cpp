@@ -33,7 +33,8 @@ void Renderer::Init()
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
 
 	generatePrimaryRaysKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer);
-	extendKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, scene.primitiveInfoBuffer, scene.totalPrimitives);
+	extendKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, scene.totalPrimitives,
+							   scene.primitiveTypeBuffer, scene.info1Buffer, scene.info2Buffer, scene.info3Buffer, scene.infoFloatBuffer, scene.infoMatrixBuffer);
 
 	// DELETE LATER
 	originBuffer->CopyToDevice(false);
@@ -42,7 +43,12 @@ void Renderer::Init()
 	primIdxBuffer->CopyToDevice(false);
 
 	// Primitive info buffer
-	scene.primitiveInfoBuffer->CopyToDevice(false);
+	scene.primitiveTypeBuffer->CopyToDevice(false);
+	scene.info1Buffer->CopyToDevice(false);
+	scene.info2Buffer->CopyToDevice(false);
+	scene.info3Buffer->CopyToDevice(false);
+	scene.infoFloatBuffer->CopyToDevice(false);
+	scene.infoMatrixBuffer->CopyToDevice(false);
 
 	// DELETE LATER
 	shadowOrigins = new float3[SCRWIDTH * SCRHEIGHT];

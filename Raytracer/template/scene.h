@@ -87,7 +87,14 @@ public:
         primitives = new float3[totalPrimitives];
         sphereInvrs = new float[spheres_size];
         albedos = new float3[totalPrimitives];
-        primitivesInfo = new Primitive[totalPrimitives];
+
+        primitiveType = new int[totalPrimitives];
+        primitiveInfo1 = new float3[totalPrimitives];
+        primitiveInfo2 = new float3[totalPrimitives];
+        primitiveInfo3 = new float3[totalPrimitives];
+        primitiveInfoFloat = new float[totalPrimitives];
+        primitiveInfoMatrix = new mat4[totalPrimitives];
+        
 
         for (int i = 0; i < totalPrimitives; i++)
         {
@@ -97,11 +104,14 @@ public:
             {
                 primitives[i] = quads[i].N;
                 albedos[i] = quads[i].material.color;
-
-                primitivesInfo[i].type = 2;
-                primitivesInfo[i].pos1 = 0;
-                primitivesInfo[i].pos2 = 0;
-                primitivesInfo[i].pos3 = 0;
+                   
+                // TODO: 
+                primitiveType[i] = 2;
+                primitiveInfo1[i] = 0;
+                primitiveInfo2[i] = 0;
+                primitiveInfo3[i] = 0;
+                primitiveInfoFloat[i] = quads[i].size;
+                primitiveInfoMatrix[i] = quads[i].invT;
             }
 
             lowerLimit = upperLimit;
@@ -112,11 +122,11 @@ public:
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
                 albedos[i] = spheres[i - lowerLimit].material.color;
 
-                primitivesInfo[i].type = 0;
-                primitivesInfo[i].pos1 = spheres[i - lowerLimit].pos;
-                primitivesInfo[i].pos2 = 0;
-                primitivesInfo[i].pos3 = 0;
-                primitivesInfo[i].infoFloat = spheres[i - lowerLimit].r2;
+                primitiveType[i] = 0;
+                primitiveInfo1[i] = spheres[i - lowerLimit].pos;
+                primitiveInfo2[i] = 0;
+                primitiveInfo3[i] = 0;
+                primitiveInfoFloat[i] = spheres[i - lowerLimit].r2;
             }
 
             lowerLimit = upperLimit;
@@ -129,10 +139,11 @@ public:
                 albedos[i] = float3(0);
 
                 // TODO CHANGE AND DELETE LATER
-                primitivesInfo[i].type = -1;
-                primitivesInfo[i].pos1 = 0;
-                primitivesInfo[i].pos2 = 0;
-                primitivesInfo[i].pos3 = 0;
+                primitiveType[i] = -1;
+                primitiveInfo1[i] = 0;
+                primitiveInfo2[i] = 0;
+                primitiveInfo3[i] = 0;
+                primitiveInfoFloat[i] = 0;
             }
 
             lowerLimit = upperLimit;
@@ -143,11 +154,11 @@ public:
                 primitives[i] = planes[i - lowerLimit].N;
                 albedos[i] = planes[i - lowerLimit].material.color;
 
-                primitivesInfo[i].type = 3;
-                primitivesInfo[i].pos1 = planes[i - lowerLimit].N;
-                primitivesInfo[i].pos2 = 0;
-                primitivesInfo[i].pos3 = 0;
-                primitivesInfo[i].infoFloat = planes[i - lowerLimit].d;
+                primitiveType[i] = 3;
+                primitiveInfo1[i] = planes[i - lowerLimit].N;
+                primitiveInfo2[i] = 0;
+                primitiveInfo3[i] = 0;
+                primitiveInfoFloat[i] = planes[i - lowerLimit].d;
             }
 
             if (i >= upperLimit)
@@ -155,10 +166,11 @@ public:
                 primitives[i] = triangles[i - upperLimit].N;
                 albedos[i] = triangles[i - upperLimit].material.color;
 
-                primitivesInfo[i].type = 1;
-                primitivesInfo[i].pos1 = triangles[i - upperLimit].pos1;
-                primitivesInfo[i].pos2 = triangles[i - upperLimit].pos2;
-                primitivesInfo[i].pos3 = triangles[i - upperLimit].pos3;
+                primitiveType[i] = 1;
+                primitiveInfo1[i] = triangles[i - upperLimit].pos1;
+                primitiveInfo2[i] = triangles[i - upperLimit].pos2;
+                primitiveInfo3[i] = triangles[i - upperLimit].pos3;
+                primitiveInfoFloat[i] = 0;
             }
 
         }
@@ -171,7 +183,12 @@ public:
         lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, 0);
 
         // Primitive Buffer
-        primitiveInfoBuffer = new Buffer(totalPrimitives * sizeof(Primitive), primitivesInfo);
+        primitiveTypeBuffer = new Buffer(totalPrimitives * sizeof(int), primitiveType);
+        info1Buffer = new Buffer(totalPrimitives * sizeof(float3), primitiveInfo1);
+        info2Buffer = new Buffer(totalPrimitives * sizeof(float3), primitiveInfo2);
+        info3Buffer = new Buffer(totalPrimitives * sizeof(float3), primitiveInfo3);
+        infoFloatBuffer = new Buffer(totalPrimitives * sizeof(float), primitiveInfoFloat);
+        infoMatrixBuffer = new Buffer(totalPrimitives * sizeof(mat4), primitiveInfoMatrix);
     }
         
     void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
@@ -545,10 +562,20 @@ public:
     static inline Buffer* albedoBuffer;
     static inline Buffer* lightBuffer;
 
+    int* primitiveType;
+    static inline Buffer* primitiveTypeBuffer;
+    
+    float3* primitiveInfo1;
+    float3* primitiveInfo2;
+    float3* primitiveInfo3;
+    float* primitiveInfoFloat;
+    mat4* primitiveInfoMatrix;
+    static inline Buffer* info2Buffer;
+    static inline Buffer* info3Buffer;
+    static inline Buffer* info1Buffer;
+    static inline Buffer* infoFloatBuffer;
+    static inline Buffer* infoMatrixBuffer;
 
-    // Primitive info Buffer
-    Primitive* primitivesInfo;
-    static inline Buffer* primitiveInfoBuffer;
 };
 
 }

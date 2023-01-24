@@ -1,16 +1,13 @@
-typedef struct 
-{
-    int type; // 0 = sphere, 1 = triangle, 2 = quad, 3 = plane
-    float3 info1; // shpere: pos,   triangle: pos1,     quad: _,    plane: N
-    float3 info2; // shpere: _,     triangle: pos2,     quad: _,    plane: _
-    float3 info3; // shpere: _,     triangle: pos3,     quad: _,    plane: _
-    float infofloat; // shpere: r2,     triangle: _,     quad: _,    plane: d
+// int type;        // shpere: 0,       triangle: 1,        quad: 2,        plane: 3
+// float3 info1;    // shpere: pos,     triangle: pos1,     quad: _,        plane: N
+// float3 info2;    // shpere: _,       triangle: pos2,     quad: _,        plane: _
+// float3 info3;    // shpere: _,       triangle: pos3,     quad: _,        plane: _
+// float infofloat; // shpere: r2,      triangle: _,        quad: size,     plane: d
+// mat4 infoMatrix; // shpere: _,       triangle: _,        quad: invT,     plane: _
 
-} Primitive ;
 
-// TODO: check this function (it's generated), pass invT from quad to Extend kernel (how to we convert matrix to float pointer, i assume just 16 floats) 
 // Multiply a 4x4 matrix by a 4x1 vector
-float* MultiplyMatrix(float4 a, float* matrix)  
+float4 MultiplyMatrix(float4 a, float16 matrix)
 {
     float4 result = (float4)(0, 0, 0, 0);
     for (int i = 0; i < 4; i++)
@@ -20,26 +17,35 @@ float* MultiplyMatrix(float4 a, float* matrix)
         result.z += a[i] * matrix[i + 8];
         result.w += a[i] * matrix[i + 12];
     }
-    return (float*)result;
+    return (float4)result;
 }
 
-
-// TODO: add buffer for invT matrix for quads (unless we can add them to the primitive struct)
-__kernel void Extend(__global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, __global Primitive* primitives, int primCount)
+__kernel void Extend(__global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, // ray data
+                    int primCount, __global int* primTypes, //Primitive metadata
+                    __global float3* primInfo1, __global float3* primInfo2, __global float3* primInfo3, // Primitive float3 data
+                    __global float* primInfofloat, __global float16* primInfoMatrix) // primitive misc data
 {   
     int i = get_global_id(0);
 
     for (int primId = 0; primId < primCount; primId++)
-    {
-        int type = primitives[primId].type;
-        // type seems to be wrong?? looks like it's only 0 or 2
-        // printf("%d", type);
+    {        
+        int type = primTypes[primId];
+
+        // if (i == 0)
+        // {
+        //     if(type == 2) printf("matrix: %f %f %f %f\n%f %f %f %f\n%f %f %f %f\n%f %f %f %f\n\n\n", primInfoMatrix[primId][0], primInfoMatrix[primId][1], primInfoMatrix[primId][2], primInfoMatrix[primId][3], primInfoMatrix[primId][4], primInfoMatrix[primId][5], primInfoMatrix[primId][6], primInfoMatrix[primId][7], primInfoMatrix[primId][8], primInfoMatrix[primId][9], primInfoMatrix[primId][10], primInfoMatrix[primId][11], primInfoMatrix[primId][12], primInfoMatrix[primId][13], primInfoMatrix[primId][14], primInfoMatrix[primId][15]);
+        //     printf("type: %d, info1: %f, %f, %f, info2: %f, %f, %f, info3: %f, %f, %f, infofloat: %f\n", type, primInfo1[primId].x, primInfo1[primId].y, primInfo1[primId].z, primInfo2[primId].x, primInfo2[primId].y, primInfo2[primId].z, primInfo3[primId].x, primInfo3[primId].y, primInfo3[primId].z, primInfofloat[primId]);
+        // }
+        // if (i == 1)
+        // {
+        //     printf(" primCount: %d\n\n", primCount);
+        // }
 
         if (type == 0) // shpere
         {
-            float3 oc = origins[i] - primitives[primId].info1;
+            float3 oc = origins[i] - primInfo1[primId];
             float b = dot(oc, directions[i]);
-            float c = dot(oc, oc) - primitives[primId].infofloat;
+            float c = dot(oc, oc) - primInfofloat[primId];
             float t, d = b * b - c;
             if (d <= 0) return;
             d = sqrt(d), t = -b - d;
@@ -58,13 +64,13 @@ __kernel void Extend(__global float3* origins, __global float3* directions, __gl
 
         if (type == 1) // triangle
         {
-            const float3 edge1 = primitives[primId].info2 - primitives[primId].info1;
-            const float3 edge2 = primitives[primId].info3 - primitives[primId].info1;
+            const float3 edge1 = primInfo2[primId] - primInfo1[primId];
+            const float3 edge2 = primInfo3[primId] - primInfo1[primId];
             const float3 h = cross(directions[i], edge2);
             const float a = dot(edge1, h);
             if (a > -0.0001f && a < 0.0001f) return; // ray parallel to triangle
             const float f = 1 / a;
-            const float3 s = origins[i] - primitives[primId].info1;
+            const float3 s = origins[i] - primInfo1[primId];
             const float u = f * dot(s, h);
             if (u < 0 || u > 1) return;
             const float3 q = cross(s, edge1);
@@ -79,28 +85,30 @@ __kernel void Extend(__global float3* origins, __global float3* directions, __gl
 
         if (type == 2) // quad
         {
-            //TODO: check if functions correctly
+            const float size = primInfofloat[primId];
 
-            // const float3 O = TransformPosition(ray.O, invT);
-            const float4 O4 = (float4)(ray.O, 1);
-            const float3 O = (float3)(MultiplyMatrix(O4, invT));
+            // const float3 O = TransformPosition(origins[i], primInfoMatrix[primId]);
+            const float4 O4 = (float4)(origins[i], 1);
+            const float4 Otransformed = MultiplyMatrix(O4, primInfoMatrix[primId]);
+            const float3 O = (float3)(Otransformed.x, Otransformed.y, Otransformed.z);
 
             // const float3 D = TransformVector(ray.D, invT);
-            const float4 D4 = (float4)(ray.D, 0);
-            const float3 D = (float3)(MultiplyMatrix(D4, invT));
+            const float4 D4 = (float4)(directions[i], 0);
+            const float4 Dtransformed = MultiplyMatrix(D4, primInfoMatrix[primId]);
+            const float3 D = (float3)(Dtransformed.x, Dtransformed.y, Dtransformed.z);
 
             const float t = O.y / -D.y;
-            if (t < ray.t && t > 0)
+            if (t < distances[i] && t > 0)
             {
                 float3 I = O + t * D;
                 if (I.x > -size && I.x < size && I.z > -size && I.z < size)
-                    ray.t = t, ray.objIdx = objIdx;
+                    distances[i] = t, primIdxs[i] = primId;
             }
         }
 
         if (type == 3) // plane
         {
-            float t = -(dot(origins[i], primitives[primId].info1) + primitives[primId].infofloat) / (dot(directions[i], primitives[primId].info1));
+            float t = -(dot(origins[i], primInfo1[primId]) + primInfofloat[primId]) / (dot(directions[i], primInfo1[primId]));
             if (t < distances[i] && t > 0) distances[i] = t, primIdxs[i] = primId;
         }
     }
