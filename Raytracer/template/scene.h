@@ -447,7 +447,9 @@ public:
       }
 
       randomDirection = normalize(randomDirection);
-      if (dot(normal, randomDirection) < 0) randomDirection = -randomDirection;
+
+      if (dot(normal, randomDirection) < 0)
+          randomDirection = -randomDirection;
 
       return randomDirection;
     }

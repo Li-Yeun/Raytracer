@@ -30,7 +30,7 @@ float aspect, float3 camPos)                                                    
     // Reset Buffers to initial values
     pixelIdxs[threadId] = threadId;
     energies[threadId] = (float3) (0.0f, 0.0f, 0.0f);
-    transmissions[threadId] = (float3) (1.0f, 1.0f, 1.0f);
+    transmissions[threadId] = (float3) (1.0f, 1.0f, 1.0f); // Rename to throughput
 }
 
 __kernel void GeneratePrimaryRays(__global int* rayCounter, __global int* pixelIdxs,  __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, // Primary Rays

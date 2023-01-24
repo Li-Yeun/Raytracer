@@ -317,7 +317,11 @@ float3 Renderer::Sample(Ray& ray)
 
 		// Russian Roulette
 		float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
-		if (p < RandomFloat()) break; else T *= 1.0f / p;
+
+		if (p < RandomFloat()) 
+			break; 
+
+		T *= 1.0f / p;
 
 		// continue random walk
 		float3 R = scene.DiffuseReflection(normal);
@@ -592,6 +596,7 @@ void Renderer::Tick(float deltaTime)
 			pixelIdxBuffer->CopyFromDevice(false);
 			originBuffer->CopyFromDevice(false);
 			directionBuffer->CopyFromDevice(false);
+			distanceBuffer->CopyFromDevice(false);
 			primIdxBuffer->CopyFromDevice(true);
 			
 			int counter = 0;
@@ -632,7 +637,7 @@ void Renderer::Tick(float deltaTime)
 				pixelIdxs[counter] = pixelIdxs[i];
 
 
-				counter++;
+				counter += 1;
 			}
 
 			if (counter == 0)

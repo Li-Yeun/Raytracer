@@ -57,7 +57,7 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
 
     float3 BRDF = albedos[primIdxs[threadId]] / M_PI_F;
 
-    // Pick random position
+        // Pick random position
     float3 c1c2 = normalize(lightCorners[0] - lightCorners[1]);
     float randomLength = RandomFloatSeed(seed + threadId * get_local_id(0)) * s;  // Better alternative = RandomFloatSeed(seed + threadId * get_local_id(0) + number0) * s;
     float3 u = c1c2 * randomLength;
@@ -96,9 +96,10 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
     if (p >= RandomFloat()) {
         // continue random walk
         int ei = atomic_inc(bounceCounter);
+        transmissions[pixelIdxs[threadId]] *= 1.0f / p;
 
         // Calculate a diffuse reflection
-        float3 R = (float3)(Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f);
+        float3 R = (float3) (Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f, Rand(2.0f) - 1.0f);
 
         while (magnitude(R) > 1.0f)
         {
@@ -107,17 +108,16 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
 
         R = normalize(R);
 
-        if (dot(N, R) < 0) R = -R;
+        if (dot(N, R) < 0) 
+            R = -R;
 
+        float hemiPDF = 1.0f / (M_PI_F * 2.0f);
         bounceOrigins[ei] = I + R * 0.001f;
         bounceDirections[ei] = R;
 
         bouncePixelIdxs[ei] = pixelIdxs[threadId];
-
-        float hemiPDF = 1.0f / (M_PI_F * 2.0f);
-
-        transmissions[pixelIdxs[threadId]] *= (dot(N, R) / hemiPDF) * BRDF;
         
+        transmissions[pixelIdxs[threadId]] *= (dot(N, R) / hemiPDF) * BRDF;
     }
 
 }
