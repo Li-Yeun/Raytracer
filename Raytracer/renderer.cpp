@@ -560,8 +560,9 @@ void Renderer::Tick(float deltaTime)
 
 	if (firstTick)
 	{
+		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
 		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
-			scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,			  // Primitives
+			scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer,		  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
 			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
@@ -571,8 +572,9 @@ void Renderer::Tick(float deltaTime)
 		scene.albedoBuffer->CopyToDevice(false);
 		scene.primitiveBuffer->CopyToDevice(false);
 		scene.sphereInvrBuffer->CopyToDevice(false);
-		scene.lightBuffer->CopyToDevice(false);
+		scene.textureBuffer->CopyToDevice(false);
 
+		scene.lightBuffer->CopyToDevice(false);
 		shadowPixelIdxBuffer->CopyToDevice(false);
 		shadowOriginBuffer->CopyToDevice(false);
 		shadowDirectionBuffer->CopyToDevice(false);
@@ -660,7 +662,7 @@ void Renderer::Tick(float deltaTime)
 
 			rayCounterBuffer->CopyToDevice(true);
 
-			shadeKernel->S(26, (int) RandomUInt()); // Give a random seed to the GPU
+			shadeKernel->S(27, (int) RandomUInt()); // Give a random seed to the GPU
 
 			shadeKernel->Run(counter);
 
@@ -772,7 +774,7 @@ void Renderer::Tick(float deltaTime)
 
 				rayCounterBuffer->CopyToDevice(true);
 				
-				shadeKernel->S(26, (int)RandomUInt()); // Give a random seed to the GPU
+				shadeKernel->S(27, (int)RandomUInt()); // Give a random seed to the GPU
 				
 				shadeKernel->Run(counter);
 				

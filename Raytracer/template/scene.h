@@ -147,6 +147,10 @@ public:
         float4* lights = new float4[3]{ float4(quads[0].c1,0), float4(quads[0].c2, 0), float4(quads[0].c3, 0) };
         lightBuffer = new Buffer(1 * 3 * sizeof(float4), lights, 0);
 
+
+        static Surface logo("assets/logo.png");
+        textureBuffer = new Buffer(logo.width * logo.height * sizeof(uint), logo.pixels, 0); // Todo set this as texture memory
+
         isInitialized = true;
     }
         
@@ -523,6 +527,7 @@ public:
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
     static inline Buffer* lightBuffer;
+    static inline Buffer* textureBuffer;
 
     // Check if scene has been fully initialzed
     bool isInitialized = false;
