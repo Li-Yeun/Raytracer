@@ -70,7 +70,7 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
     
     float3 L = light_point - I;
     float dist = magnitude(L); // CHECK IF OPENCL DISTANCE DOES THE SAME
-	L = normalize(L);
+	L /= dist;
 
     if (dot(N, L) > 0 && dot(primNorms[0], -L) > 0) {
 
