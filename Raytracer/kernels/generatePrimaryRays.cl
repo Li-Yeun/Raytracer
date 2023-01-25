@@ -3,9 +3,9 @@
 
 __global int counter = 0; // Check if this has to be 0 or -1
 
-__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs,  // Primary Rays
- __global float3* energies, __global float3* transmissions,                                                                                                                  // E & T
-float aspect, float3 camPos)                                                                                                                                                 // Camera Properties
+__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,  // Primary Rays
+ __global float4* energies, __global float4* transmissions,                                                                                                                  // E & T
+float aspect, float4 camPos)                                                                                                                                                 // Camera Properties
 {
     int threadId = get_global_id(0);
     
@@ -15,13 +15,14 @@ float aspect, float3 camPos)                                                    
     float u = (float)x * (1.0f / SCRWIDTH);
 	float v = (float)y * (1.0f / SCRHEIGHT);
     
-    float3 topLeft = (float3) ( -aspect, 1.0f, 0.0f );
-	float3 topRight = (float3)( aspect, 1.0f, 0.0f );
-	float3 bottomLeft = (float3) ( -aspect, -1.0f, 0.0f );
+    float4 topLeft = (float4) ( -aspect, 1.0f, 0.0f, 0.0f );
+	float4 topRight = (float4)( aspect, 1.0f, 0.0f, 0.0f );
+	float4 bottomLeft = (float4) ( -aspect, -1.0f, 0.0f, 0.0f );
 
-    float3 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
+    float4 P = topLeft + u * (topRight - topLeft) + v * (bottomLeft - topLeft);
 
     origins[threadId] = camPos;
+
     directions[threadId] = normalize(P - camPos);
 
     distances[threadId] = INFINITY;
@@ -29,13 +30,13 @@ float aspect, float3 camPos)                                                    
 
     // Reset Buffers to initial values
     pixelIdxs[threadId] = threadId;
-    energies[threadId] = (float3) (0.0f, 0.0f, 0.0f);
-    transmissions[threadId] = (float3) (1.0f, 1.0f, 1.0f); // Rename to throughput
+    energies[threadId] = (float4) (0.0f, 0.0f, 0.0f, 0.0f);
+    transmissions[threadId] = (float4) (1.0f, 1.0f, 1.0f, 0.0f); // Rename to throughput
 }
 
-__kernel void GeneratePrimaryRays(__global int* rayCounter, __global int* pixelIdxs,  __global float3* origins, __global float3* directions, __global float* distances, __global int* primIdxs, // Primary Rays
+__kernel void GeneratePrimaryRays(__global int* rayCounter, __global int* pixelIdxs,  __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, // Primary Rays
 __global int* shadowCounter,                                                                                                                                                                    // Shadow Rays  
-__global int* bounceCounter, __global int* bouncePixelIdxs, __global float3* bounceOrigins, __global float3* bounceDirections)                                                                  // Bounce Rays                                                                                                                                                                  // Camera Properties
+__global int* bounceCounter, __global int* bouncePixelIdxs, __global float4* bounceOrigins, __global float4* bounceDirections)                                                                  // Bounce Rays                                                                                                                                                                  // Camera Properties
 {
     int threadId = get_global_id(0);
     

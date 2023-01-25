@@ -24,39 +24,39 @@ void Renderer::Init()
 
 	// DELETE LATER
 	rayCounter = new int[1]{ 0 };
-	pixelIdxs = new int[SCRWIDTH * SCRHEIGHT]{ 0 };
-	origins = new float3[SCRWIDTH * SCRHEIGHT]{ float3(0) };
-	directions = new float3[SCRWIDTH * SCRHEIGHT]{ float3(0) };;
-	distances = new float[SCRWIDTH * SCRHEIGHT]{ 0 };
-	primIdxs = new int[SCRWIDTH * SCRHEIGHT]{ 0 };
+	pixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
+	origins = new float4[SCRWIDTH * SCRHEIGHT];
+	directions = new float4[SCRWIDTH * SCRHEIGHT];
+	distances = new float[SCRWIDTH * SCRHEIGHT];
+	primIdxs = new int[SCRWIDTH * SCRHEIGHT];
 
 	// Primary Ray Buffers
 	rayCounterBuffer = new Buffer(1 * sizeof(int), rayCounter, 0);
 	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), pixelIdxs, 0);
-	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), origins, 0);
-	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), directions, 0);
+	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), origins, 0);
+	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), directions, 0);
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), distances, 0);
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
 
 	// DELETE LATER
-	energies = new float3[SCRWIDTH * SCRHEIGHT]{ float3(0) };
-	transmissions = new float3[SCRWIDTH * SCRHEIGHT]{ float3(1) };
+	energies = new float4[SCRWIDTH * SCRHEIGHT];
+	transmissions = new float4[SCRWIDTH * SCRHEIGHT];
 	// E & T Buffers
-	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), energies, 0);
-	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), transmissions, 0);
+	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), energies, 0);
+	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), transmissions, 0);
 
 	// DELETE LATER
 	shadowCounter = new int[1]{ 0 };
-	shadowPixelIdxs = new int[SCRWIDTH * SCRHEIGHT]{ 0 };
-	shadowOrigins = new float3[SCRWIDTH * SCRHEIGHT]{float3(0)};
-	shadowDirections = new float3[SCRWIDTH * SCRHEIGHT]{float3(0)};
-	shadowDistances = new float[SCRWIDTH * SCRHEIGHT]{0};
+	shadowPixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
+	shadowOrigins = new float4[SCRWIDTH * SCRHEIGHT];
+	shadowDirections = new float4[SCRWIDTH * SCRHEIGHT];
+	shadowDistances = new float[SCRWIDTH * SCRHEIGHT];
 
 	// Shadow Ray Buffers
 	shadowCounterBuffer = new Buffer(1 * sizeof(int), shadowCounter, 0);
 	shadowPixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), shadowPixelIdxs, 0);
-	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowOrigins, 0);
-	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowDirections, 0);
+	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), shadowOrigins, 0);
+	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), shadowDirections, 0);
 	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), shadowDistances, 0);
 
 	// DELETE LATER
@@ -65,8 +65,8 @@ void Renderer::Init()
 	// Bounce Ray Buffers
 	bounceCounterBuffer = new Buffer(1 * sizeof(int), bounceCounter, 0);
 	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));  // Check
-	bounceOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3)); // Check
-	bounceDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3)); // Check
+	bounceOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4)); // Check
+	bounceDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4)); // Check
 
 	// Set Kernel Arguments
 	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
@@ -562,7 +562,7 @@ void Renderer::Tick(float deltaTime)
 	{
 		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
 			scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.quads_size, scene.spheres_size,			  // Primitives
-			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, scene.quads[0].material.emission,							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
+			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
 			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
 			bounceCounterBuffer, bouncePixelIdxBuffer, bounceOriginBuffer, bounceDirectionBuffer
@@ -593,7 +593,7 @@ void Renderer::Tick(float deltaTime)
 			accumulatedFrames += 1;
 
 			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
-			generateInitialPrimaryRaysKernel->S(8, camera->camPos);
+			generateInitialPrimaryRaysKernel->S(8, float4(camera->camPos, 0));
 
 			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
@@ -606,7 +606,9 @@ void Renderer::Tick(float deltaTime)
 			int counter = 0;
 			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
 			{
-				Ray ray = Ray(origins[i], directions[i]);
+				float3 origin = float3(origins[i].x, origins[i].y, origins[i].z);
+				float3 direction = float3(directions[i].x, directions[i].y, directions[i].z);
+				Ray ray = Ray(origin, direction);
 
 				scene.quads[0].Intersect(ray);
 				//scene.cubes[0].Intersect(ray);
@@ -676,7 +678,10 @@ void Renderer::Tick(float deltaTime)
 			std::cout <<  "InitialShadowCounter:" << shadowCounter[0] << std::endl;
 			for (int i = 0; i < shadowCounter[0]; i++)
 			{
-				Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
+				float3 shadowOrigin = float3(shadowOrigins[i].x, shadowOrigins[i].y, shadowOrigins[i].z);
+				float3 shadowDirection = float3(shadowDirections[i].x, shadowDirections[i].y, shadowDirections[i].z);
+
+				Ray ray = Ray(shadowOrigin, shadowDirection, shadowDistances[i]);
 
 				scene.quads[0].Intersect(ray);
 				//scene.cubes[0].Intersect(ray);
@@ -689,7 +694,7 @@ void Renderer::Tick(float deltaTime)
 
 				if (!isOccluded)
 				{
-					accumulator[shadowPixelIdxs[i]] += float4(energies[i], 0);
+					accumulator[shadowPixelIdxs[i]] += energies[i];
 				}
 			}
 
@@ -715,8 +720,9 @@ void Renderer::Tick(float deltaTime)
 				int counter = 0;
 				for (int i = 0; i < rayCounter[0]; i++)
 				{
-
-					Ray ray = Ray(origins[i], directions[i]);
+					float3 origin = float3(origins[i].x, origins[i].y, origins[i].z);
+					float3 direction = float3(directions[i].x, directions[i].y, directions[i].z);
+					Ray ray = Ray(origin, direction);
 
 					scene.quads[0].Intersect(ray);
 					//scene.cubes[0].Intersect(ray);
@@ -782,7 +788,10 @@ void Renderer::Tick(float deltaTime)
 
 				for (int i = 0; i < shadowCounter[0]; i++)
 				{
-					Ray ray = Ray(shadowOrigins[i], shadowDirections[i], shadowDistances[i]);
+					float3 shadowOrigin = float3(shadowOrigins[i].x, shadowOrigins[i].y, shadowOrigins[i].z);
+					float3 shadowDirection = float3(shadowDirections[i].x, shadowDirections[i].y, shadowDirections[i].z);
+
+					Ray ray = Ray(shadowOrigin, shadowDirection, shadowDistances[i]);
 
 					scene.quads[0].Intersect(ray);
 					//scene.cubes[0].Intersect(ray);
@@ -795,7 +804,7 @@ void Renderer::Tick(float deltaTime)
 
 					if (!isOccluded)
 					{
-						accumulator[shadowPixelIdxs[i]] += float4(energies[i], 0);
+						accumulator[shadowPixelIdxs[i]] += energies[i];
 					}
 				}
 

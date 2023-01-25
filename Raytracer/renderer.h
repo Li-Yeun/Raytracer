@@ -95,7 +95,7 @@ public:
 	static inline Buffer* accumulatorBuffer;
 
 	// DELETE LATER
-	float3* origins, *directions;
+	float4* origins, *directions;
 	float* distances;
 	int* primIdxs, *rayCounter, *pixelIdxs;
 
@@ -108,14 +108,14 @@ public:
 	static inline Buffer* primIdxBuffer;
 
 	// DELETE LATER
-	float3* energies, *transmissions;
+	float4* energies, *transmissions;
 
 	// E & T
 	static inline Buffer* energyBuffer;
 	static inline Buffer* transmissionBuffer;
 
 	// DELETE LATER
-	float3* shadowOrigins, *shadowDirections;
+	float4* shadowOrigins, *shadowDirections;
 	float* shadowDistances;
 	int* shadowCounter, *shadowPixelIdxs;
 

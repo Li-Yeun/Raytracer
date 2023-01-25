@@ -77,9 +77,9 @@ public:
 
         std::cout << "Loading objects ..." << std::endl;
 
-        LoadObject("assets/pyramid.obj", glass_mat, float3(0, 0, 1.5));
-        //LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
-        //LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj", glass_mat, float3(0, 0, 1.5));
+        LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
 
         bvh = new BVH(spheres, spheres_size, planes, planes_size, triangles, triangles_size);
         SetTime( 0 );
@@ -90,9 +90,9 @@ public:
 
         int totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
 
-        primitives = new float3[totalPrimitives];
+        primitives = new float4[totalPrimitives];
         sphereInvrs = new float[spheres_size];
-        albedos = new float3[totalPrimitives];
+        albedos = new float4[totalPrimitives];
 
         for (int i = 0; i < totalPrimitives; i++)
         {
@@ -100,17 +100,17 @@ public:
             int upperLimit = quads_size;
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = quads[i].N;
-                albedos[i] = quads[i].material.color;
+                primitives[i] = float4(quads[i].N, 0);
+                albedos[i] = float4(quads[i].material.color, 0);
             }
 
             lowerLimit = upperLimit;
             upperLimit += spheres_size;
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = spheres[i - lowerLimit].N;
+                primitives[i] = float4(spheres[i - lowerLimit].N, 0);
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
-                albedos[i] = spheres[i - lowerLimit].material.color;
+                albedos[i] = float4(spheres[i - lowerLimit].material.color, 0);
             }
 
             lowerLimit = upperLimit;
@@ -119,8 +119,8 @@ public:
             if (i >= lowerLimit && i < upperLimit)
             {
                 // TODO CHANGE AND DELETE LATER
-                primitives[i] = float3(0);
-                albedos[i] = float3(0);
+                primitives[i] = float4(0);
+                albedos[i] = float4(0);
             }
 
             lowerLimit = upperLimit;
@@ -128,24 +128,24 @@ public:
 
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = planes[i - lowerLimit].N;
-                albedos[i] = planes[i - lowerLimit].material.color;
+                primitives[i] = float4(planes[i - lowerLimit].N, 0);
+                albedos[i] = float4(planes[i - lowerLimit].material.color, 0);
             }
 
             if (i >= upperLimit)
             {
-                primitives[i] = triangles[i - upperLimit].N;
-                albedos[i] = triangles[i - upperLimit].material.color;
+                primitives[i] = float4(triangles[i - upperLimit].N, 0);
+                albedos[i] = float4(triangles[i - upperLimit].material.color, 0);
             }
 
         }
         
-        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float3), primitives , CL_MEM_READ_ONLY);
-        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, CL_MEM_READ_ONLY);
-        albedoBuffer = new Buffer(totalPrimitives * sizeof(float3), albedos, CL_MEM_READ_ONLY);
+        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , 0);
+        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, 0);
+        albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, 0);//CL_MEM_READ_ONLY);
 
-        float3* lights = new float3[3]{ quads[0].c1, quads[0].c2, quads[0].c3 };
-        lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, CL_MEM_READ_ONLY);
+        float4* lights = new float4[3]{ float4(quads[0].c1,0), float4(quads[0].c2, 0), float4(quads[0].c3, 0) };
+        lightBuffer = new Buffer(1 * 3 * sizeof(float4), lights, 0);
 
         isInitialized = true;
     }
@@ -516,9 +516,9 @@ public:
     bool useQBVH = true;
 
     // Primitive Buffers
-    float3* primitives;
+    float4* primitives;
     float* sphereInvrs;
-    float3* albedos;
+    float4* albedos;
     static inline Buffer* albedoBuffer;
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
