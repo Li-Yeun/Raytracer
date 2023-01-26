@@ -84,14 +84,14 @@ public:
 
         totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
 
-        primitives = new float3[totalPrimitives];
+        primitives = new float4[totalPrimitives];
         sphereInvrs = new float[spheres_size];
-        albedos = new float3[totalPrimitives];
+        albedos = new float4[totalPrimitives];
 
         primitiveType = new int[totalPrimitives];
-        primitiveInfo1 = new float3[totalPrimitives];
-        primitiveInfo2 = new float3[totalPrimitives];
-        primitiveInfo3 = new float3[totalPrimitives];
+        primitiveInfo1 = new float4[totalPrimitives];
+        primitiveInfo2 = new float4[totalPrimitives];
+        primitiveInfo3 = new float4[totalPrimitives];
         primitiveInfoFloat = new float[totalPrimitives];
         primitiveInfoMatrix = new mat4[totalPrimitives];
         
@@ -102,14 +102,14 @@ public:
             int upperLimit = quads_size;
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = quads[i].N;
-                albedos[i] = quads[i].material.color;
+                primitives[i] = float4(quads[i].N, 0);
+                albedos[i] = float4(quads[i].material.color, 0);
                    
                 // TODO: 
                 primitiveType[i] = 2;
-                primitiveInfo1[i] = 0;
-                primitiveInfo2[i] = 0;
-                primitiveInfo3[i] = 0;
+                primitiveInfo1[i] = float4(0);
+                primitiveInfo2[i] = float4(0);
+                primitiveInfo3[i] = float4(0);
                 primitiveInfoFloat[i] = quads[i].size;
                 primitiveInfoMatrix[i] = quads[i].invT;
             }
@@ -118,14 +118,14 @@ public:
             upperLimit += spheres_size;
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = spheres[i - lowerLimit].N;
+                primitives[i] = float4(spheres[i - lowerLimit].N, 0);
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
-                albedos[i] = spheres[i - lowerLimit].material.color;
+                albedos[i] = float4(spheres[i - lowerLimit].material.color, 0);
 
                 primitiveType[i] = 0;
-                primitiveInfo1[i] = spheres[i - lowerLimit].pos;
-                primitiveInfo2[i] = 0;
-                primitiveInfo3[i] = 0;
+                primitiveInfo1[i] = float4(spheres[i - lowerLimit].pos, 0);
+                primitiveInfo2[i] = float4(0);
+                primitiveInfo3[i] = float4(0);
                 primitiveInfoFloat[i] = spheres[i - lowerLimit].r2;
             }
 
@@ -135,14 +135,14 @@ public:
             if (i >= lowerLimit && i < upperLimit)
             {
                 // TODO CHANGE AND DELETE LATER
-                primitives[i] = float3(0);
-                albedos[i] = float3(0);
+                primitives[i] = float4(0);
+                albedos[i] = float4(0);
 
                 // TODO CHANGE AND DELETE LATER
                 primitiveType[i] = -1;
-                primitiveInfo1[i] = 0;
-                primitiveInfo2[i] = 0;
-                primitiveInfo3[i] = 0;
+                primitiveInfo1[i] = float4(0);
+                primitiveInfo2[i] = float4(0);
+                primitiveInfo3[i] = float4(0);
                 primitiveInfoFloat[i] = 0;
             }
 
@@ -151,42 +151,42 @@ public:
 
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = planes[i - lowerLimit].N;
-                albedos[i] = planes[i - lowerLimit].material.color;
+                primitives[i] = float4(planes[i - lowerLimit].N, 0);
+                albedos[i] = float4(planes[i - lowerLimit].material.color, 0);
 
                 primitiveType[i] = 3;
-                primitiveInfo1[i] = planes[i - lowerLimit].N;
-                primitiveInfo2[i] = 0;
-                primitiveInfo3[i] = 0;
+                primitiveInfo1[i] = float4(planes[i - lowerLimit].N, 0);
+                primitiveInfo2[i] = float4(0);
+                primitiveInfo3[i] = float4(0);
                 primitiveInfoFloat[i] = planes[i - lowerLimit].d;
             }
 
             if (i >= upperLimit)
             {
-                primitives[i] = triangles[i - upperLimit].N;
-                albedos[i] = triangles[i - upperLimit].material.color;
+                primitives[i] = float4(triangles[i - upperLimit].N, 0);
+                albedos[i] = float4(triangles[i - upperLimit].material.color, 0);
 
                 primitiveType[i] = 1;
-                primitiveInfo1[i] = triangles[i - upperLimit].pos1;
-                primitiveInfo2[i] = triangles[i - upperLimit].pos2;
-                primitiveInfo3[i] = triangles[i - upperLimit].pos3;
+                primitiveInfo1[i] = float4(triangles[i - upperLimit].pos1, 0);
+                primitiveInfo2[i] = float4(triangles[i - upperLimit].pos2, 0);
+                primitiveInfo3[i] = float4(triangles[i - upperLimit].pos3, 0);
                 primitiveInfoFloat[i] = 0;
             }
 
         }
         
-        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float3), primitives , 0);
+        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , 0);
         sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, 0);
-        albedoBuffer = new Buffer(totalPrimitives * sizeof(float3), albedos, 0);
+        albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, 0);
 
         float3* lights = new float3[3]{ quads[0].c1, quads[0].c2, quads[0].c3 };
         lightBuffer = new Buffer(1 * 3 * sizeof(float3), lights, 0);
 
         // Primitive Buffer
         primitiveTypeBuffer = new Buffer(totalPrimitives * sizeof(int), primitiveType);
-        info1Buffer = new Buffer(totalPrimitives * sizeof(float3), primitiveInfo1);
-        info2Buffer = new Buffer(totalPrimitives * sizeof(float3), primitiveInfo2);
-        info3Buffer = new Buffer(totalPrimitives * sizeof(float3), primitiveInfo3);
+        info1Buffer = new Buffer(totalPrimitives * sizeof(float4), primitiveInfo1);
+        info2Buffer = new Buffer(totalPrimitives * sizeof(float4), primitiveInfo2);
+        info3Buffer = new Buffer(totalPrimitives * sizeof(float4), primitiveInfo3);
         infoFloatBuffer = new Buffer(totalPrimitives * sizeof(float), primitiveInfoFloat);
         infoMatrixBuffer = new Buffer(totalPrimitives * sizeof(mat4), primitiveInfoMatrix);
     }
@@ -554,9 +554,9 @@ public:
     bool useQBVH = true;
 
     // Primitive Buffers
-    float3* primitives;
+    float4* primitives;
     float* sphereInvrs;
-    float3* albedos;
+    float4* albedos;
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
     static inline Buffer* albedoBuffer;
@@ -565,9 +565,9 @@ public:
     int* primitiveType;
     static inline Buffer* primitiveTypeBuffer;
     
-    float3* primitiveInfo1;
-    float3* primitiveInfo2;
-    float3* primitiveInfo3;
+    float4* primitiveInfo1;
+    float4* primitiveInfo2;
+    float4* primitiveInfo3;
     float* primitiveInfoFloat;
     mat4* primitiveInfoMatrix;
     static inline Buffer* info2Buffer;

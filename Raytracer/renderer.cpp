@@ -21,14 +21,14 @@ void Renderer::Init()
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
 
 	// DELETE LATER
-	origins = new float3[SCRWIDTH * SCRHEIGHT];
-	directions = new float3[SCRWIDTH * SCRHEIGHT];
+	origins = new float4[SCRWIDTH * SCRHEIGHT];
+	directions = new float4[SCRWIDTH * SCRHEIGHT];
 	distances = new float[SCRWIDTH * SCRHEIGHT];
 	primIdxs = new int[SCRWIDTH * SCRHEIGHT];
 
 	// Ray Buffers
-	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), origins, 0);
-	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), directions, 0);
+	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), origins, 0);
+	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), directions, 0);
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), distances, 0);
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
 
@@ -56,10 +56,10 @@ void Renderer::Init()
 	shadowDistances = new float[SCRWIDTH * SCRHEIGHT];
 
 	// Shadow Ray Buffers
-	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowOrigins, 0);
-	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3), shadowDirections, 0);
+	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), shadowOrigins, 0);
+	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), shadowDirections, 0);
 	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float), shadowDistances, 0);
-	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float3));
+	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
 	shadeKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,

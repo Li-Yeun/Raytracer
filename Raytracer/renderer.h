@@ -94,7 +94,7 @@ public:
 	static inline Buffer* accumulatorBuffer;
 
 	// DELETE LATER
-	float3* origins, *directions;
+	float4* origins, *directions;
 	float* distances;
 	int* primIdxs;
 
