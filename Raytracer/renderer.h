@@ -115,6 +115,13 @@ public:
 	static inline Buffer* energyBuffer;
 	static inline Buffer* pixelIdxBuffer;
 
+	// BVH buffers
+	static inline Buffer* aabbMinBuffer;
+	static inline Buffer* aabbMaxBuffer;
+	static inline Buffer* leftFirstBuffer;
+	static inline Buffer* primitiveCountBuffer;
+	static inline Buffer* bvhPrimitiveIdxBuffer;
+
 };
 
 } // namespace Tmpl8

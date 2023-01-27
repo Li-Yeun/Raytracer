@@ -33,8 +33,18 @@ void Renderer::Init()
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), primIdxs, 0);
 
 	generatePrimaryRaysKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer);
+
+	// BVH buffers
+	aabbMinBuffer =			new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), scene.bvh->aabbMinList);
+	aabbMaxBuffer =			new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), scene.bvh->aabbMaxList);
+	leftFirstBuffer =		new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), scene.bvh->leftFirstList);
+	primitiveCountBuffer =	new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), scene.bvh->primitiveCountList);
+	bvhPrimitiveIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int), scene.bvh->bvhPrimitiveIdxList);
+
 	extendKernel->SetArguments(originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, scene.totalPrimitives,
-							   scene.primitiveTypeBuffer, scene.info1Buffer, scene.info2Buffer, scene.info3Buffer, scene.infoFloatBuffer, scene.infoMatrixBuffer);
+							   scene.primitiveTypeBuffer, scene.info1Buffer, scene.info2Buffer, scene.info3Buffer, scene.infoFloatBuffer, scene.infoMatrixBuffer,
+							   aabbMinBuffer, aabbMaxBuffer, leftFirstBuffer, primitiveCountBuffer, bvhPrimitiveIdxBuffer);
+
 
 	// DELETE LATER
 	originBuffer->CopyToDevice(false);

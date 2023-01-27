@@ -47,6 +47,13 @@ public:
     BVHNode* bvhNode = 0;
     uint rootNodeIdx = 0, planeRootNodeIdx = 1, primitveRootNodeIdx = 2, nodesUsed = 3;
 
+	//buffers
+	float4* aabbMinList;
+	float4* aabbMaxList;
+	uint* leftFirstList;
+	uint* primitiveCountList;
+	int* bvhPrimitiveIdxList;
+
 	// QBVH
 	SIMD_BVH_Node* qbvhNode = 0;
 	uint nodesUsedQBVH = 0;
@@ -242,7 +249,8 @@ public:
 
 	void BuildBVH()
 	{
-		bvhNode = new BVHNode[(spheres_size + triangles_size) * 2 + 1]; // 1 leaf node reserved for planes
+		int nBvhNodes = (spheres_size + triangles_size) * 2 + 1;
+		bvhNode = new BVHNode[nBvhNodes]; // 1 leaf node reserved for planes
 		primitiveIdx = new int[spheres_size + triangles_size];
 		// populate triangle index array
 		for (int i = 0; i < spheres_size + triangles_size; i++) primitiveIdx[i] = i;
@@ -261,6 +269,23 @@ public:
 
 		UpdateNodeBounds(primitveRootNodeIdx);
 		Subdivide(primitveRootNodeIdx);
+
+
+		aabbMinList = new float4[nBvhNodes];
+		aabbMaxList = new float4[nBvhNodes];
+		leftFirstList = new uint[nBvhNodes];
+		primitiveCountList = new uint[nBvhNodes];
+
+		// Prepare lists for GPU buffers
+		for (int i = 0; i < nBvhNodes; i++)
+		{
+			aabbMinList[i] = bvhNode[i].aabbMin;
+			aabbMaxList[i] = bvhNode[i].aabbMax;
+			leftFirstList[i] = bvhNode[i].leftFirst;
+			primitiveCountList[i] = bvhNode[i].primitiveCount;
+		}
+		bvhPrimitiveIdxList = primitiveIdx;
+
 	}
 
 	void UpdateNodeBounds(uint nodeIdx)
