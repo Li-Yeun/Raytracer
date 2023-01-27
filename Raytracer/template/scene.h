@@ -77,9 +77,9 @@ public:
 
         std::cout << "Loading objects ..." << std::endl;
 
-        LoadObject("assets/monkey.obj", glass_mat, float3(0, 0, 1.5));
-        LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
-        LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
+        LoadObject("assets/pyramid.obj", glass_mat, float3(0, 0, 1.5));
+        //LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
+        //LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
 
         bvh = new BVH(spheres, spheres_size, planes, planes_size, triangles, triangles_size);
         SetTime( 0 );
@@ -89,7 +89,17 @@ public:
         std::cout << std::endl << triangles_size << " Triangles loaded" << std::endl << std::endl << std::endl;
 
         int totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
+        
+        //  Intersections
+        primMaterials = new int[totalPrimitives];
+        quadMatrices = new mat4[quads_size];
+        quadSizes = new float[quads_size];
+        sphereInfos = new float4[spheres_size];
+        triangleInfos1 = new float4[triangles_size];
+        triangleInfos2 = new float4[triangles_size];
+        triangleInfos3 = new float4[triangles_size];
 
+        // Normals
         primitives = new float4[totalPrimitives];
         sphereInvrs = new float[spheres_size];
         albedos = new float4[totalPrimitives];
@@ -100,6 +110,10 @@ public:
             int upperLimit = quads_size;
             if (i >= lowerLimit && i < upperLimit)
             {
+                primMaterials[i] = (int) quads[i].material.type;
+                quadMatrices[i] = quads[i].invT;
+                quadSizes[i] = quads[i].size;
+
                 primitives[i] = float4(quads[i].N, 0);
                 albedos[i] = float4(quads[i].material.color, 0);
             }
@@ -108,6 +122,9 @@ public:
             upperLimit += spheres_size;
             if (i >= lowerLimit && i < upperLimit)
             {
+                primMaterials[i] = (int) spheres[i - lowerLimit].material.type;
+                sphereInfos[i - lowerLimit] = float4(spheres[i - lowerLimit].pos, spheres[i - lowerLimit].r2);
+
                 primitives[i] = float4(spheres[i - lowerLimit].N, 0);
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
                 albedos[i] = float4(spheres[i - lowerLimit].material.color, 0);
@@ -118,6 +135,8 @@ public:
 
             if (i >= lowerLimit && i < upperLimit)
             {
+                primMaterials[i] = (int) cubes[i - lowerLimit].material.type;
+
                 // TODO CHANGE AND DELETE LATER
                 primitives[i] = float4(0);
                 albedos[i] = float4(0);
@@ -128,18 +147,34 @@ public:
 
             if (i >= lowerLimit && i < upperLimit)
             {
-                primitives[i] = float4(planes[i - lowerLimit].N, 0);
+                primMaterials[i] = (int)planes[i - lowerLimit].material.type;
+
+                primitives[i] = float4(planes[i - lowerLimit].N, planes[i - lowerLimit].d);
                 albedos[i] = float4(planes[i - lowerLimit].material.color, 0);
             }
 
             if (i >= upperLimit)
             {
+                primMaterials[i] = (int)triangles[i - upperLimit].material.type;
+                triangleInfos1[i - upperLimit] = float4(triangles[i - upperLimit].pos1, 0.0f);
+                triangleInfos2[i - upperLimit] = float4(triangles[i - upperLimit].pos2, 0.0f);
+                triangleInfos3[i - upperLimit] = float4(triangles[i - upperLimit].pos3, 0.0f);
+
                 primitives[i] = float4(triangles[i - upperLimit].N, 0);
                 albedos[i] = float4(triangles[i - upperLimit].material.color, 0);
             }
 
         }
-        
+        // Intersections
+        primMaterialBuffer = new Buffer(totalPrimitives * sizeof(int), primMaterials, 0);
+        quadMatrixBuffer = new Buffer(quads_size * sizeof(mat4), quadMatrices, 0);
+        quadSizeBuffer = new Buffer(quads_size * sizeof(float), quadSizes, 0);
+        sphereInfoBuffer = new Buffer(spheres_size * sizeof(float4), sphereInfos, 0);
+        triangleInfo1Buffer = new Buffer(triangles_size * sizeof(float4), triangleInfos1, 0);
+        triangleInfo2Buffer = new Buffer(triangles_size * sizeof(float4), triangleInfos2, 0);
+        triangleInfo3Buffer = new Buffer(triangles_size * sizeof(float4), triangleInfos3, 0);
+
+        // Normals
         primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , 0);
         sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, 0);
         albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, 0);//CL_MEM_READ_ONLY);
@@ -520,14 +555,37 @@ public:
     bool useQBVH = true;
 
     // Primitive Buffers
+
+    static inline Buffer* albedoBuffer;
+    static inline Buffer* textureBuffer;
+    static inline Buffer* lightBuffer;
+
+    // Intersection
+    int* primMaterials;
+    mat4* quadMatrices;
+    float* quadSizes;
+    float4* sphereInfos;
+    // TODO CUBES
+    float4* triangleInfos1;
+    float4* triangleInfos2;
+    float4* triangleInfos3;
+  
+    static inline Buffer* primMaterialBuffer;
+    static inline Buffer* quadMatrixBuffer;
+    static inline Buffer* quadSizeBuffer;
+    static inline Buffer* sphereInfoBuffer;
+    static inline Buffer* triangleInfo1Buffer;
+    static inline Buffer* triangleInfo2Buffer;
+    static inline Buffer* triangleInfo3Buffer;
+    // Normals
     float4* primitives;
     float* sphereInvrs;
     float4* albedos;
-    static inline Buffer* albedoBuffer;
+
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
-    static inline Buffer* lightBuffer;
-    static inline Buffer* textureBuffer;
+
+
 
     // Check if scene has been fully initialzed
     bool isInitialized = false;

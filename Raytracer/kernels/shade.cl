@@ -63,10 +63,13 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
 {   
     int threadId = get_global_id(0);
 
-    if(threadId >= *rayCounter) // TODO CHECK IF THIS IS NEED WHEN USING GPU if(threadId >= *rayCounter - 1)
+    if(threadId >= *rayCounter)
     {
         return;
     }
+
+    if (primIdxs[threadId] == -1)
+        return;
 
      // TODO CHECK IF MATERIAL IS LIGHT (PROBABLY DO THIS IN EXTEND KERNEL ALREADY)
 
@@ -78,13 +81,15 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
         N = (I - primNorms[primIdxs[threadId]]) * sphereInvrs[primIdxs[threadId] - (int)primStartIdx.x];
     else
         N = primNorms[primIdxs[threadId]];
-    
+        
     if (dot( N, directions[threadId] ) > 0)
         N = -N; // hit backside / inside
 
     float4 albedo;
     if (primIdxs[threadId] >= (int)primStartIdx.y && primIdxs[threadId] < (int)primStartIdx.y + (int)primCount.y) // If primitive = plane
+    {
         albedo = GetAlbedo(I, N, texture);
+    }
     else
         albedo = albedos[primIdxs[threadId]];
 

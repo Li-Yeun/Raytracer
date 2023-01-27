@@ -23,7 +23,7 @@ void Renderer::Init()
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
 
 	// DELETE LATER
-	rayCounter = new int[1]{ 0 };
+	rayCounter = new int[1]{ SCRWIDTH * SCRHEIGHT };
 	pixelIdxs = new int[SCRWIDTH * SCRHEIGHT];
 	origins = new float4[SCRWIDTH * SCRHEIGHT];
 	directions = new float4[SCRWIDTH * SCRHEIGHT];
@@ -560,6 +560,18 @@ void Renderer::Tick(float deltaTime)
 
 	if (firstTick)
 	{
+		extendKernel->SetArguments(rayCounterBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+		scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
+		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfo1Buffer, scene.triangleInfo2Buffer, scene.triangleInfo3Buffer);
+
+		scene.quadMatrixBuffer->CopyToDevice(false);
+		scene.quadSizeBuffer->CopyToDevice(false);
+		scene.sphereInfoBuffer->CopyToDevice(false);
+		scene.primitiveBuffer->CopyToDevice(false);
+		scene.triangleInfo1Buffer->CopyToDevice(false);
+		scene.triangleInfo2Buffer->CopyToDevice(false);
+		scene.triangleInfo3Buffer->CopyToDevice(false);
+
 		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
 		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
 			scene.albedoBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer,		  // Primitives
@@ -570,9 +582,9 @@ void Renderer::Tick(float deltaTime)
 		);
 
 		scene.albedoBuffer->CopyToDevice(false);
-		scene.primitiveBuffer->CopyToDevice(false);
 		scene.sphereInvrBuffer->CopyToDevice(false);
 		scene.textureBuffer->CopyToDevice(false);
+		scene.primMaterialBuffer->CopyToDevice(false);
 
 		scene.lightBuffer->CopyToDevice(false);
 		shadowPixelIdxBuffer->CopyToDevice(false);
@@ -594,77 +606,40 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
+			// TODO: DO SOMETHING SMARTER TO RESET COUNTER
+			/*
+			rayCounter[0] = SCRWIDTH * SCRHEIGHT;
+			bounceCounter[0] = 0;
+			shadowCounter[0] = 0;
+
+			rayCounterBuffer->CopyToDevice(false);
+			bounceCounterBuffer->CopyToDevice(false);
+			shadowCounterBuffer->CopyToDevice(true);
+			*/
+
 			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
 			generateInitialPrimaryRaysKernel->S(8, float4(camera->camPos, 0));
 
 			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
+			// DEL
 			pixelIdxBuffer->CopyFromDevice(false);
 			originBuffer->CopyFromDevice(false);
 			directionBuffer->CopyFromDevice(false);
 			distanceBuffer->CopyFromDevice(false);
 			primIdxBuffer->CopyFromDevice(true);
+
 			clFinish(Kernel::GetQueue());
-			int counter = 0;
-			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
-			{
-				float3 origin = float3(origins[i].x, origins[i].y, origins[i].z);
-				float3 direction = float3(directions[i].x, directions[i].y, directions[i].z);
-				Ray ray = Ray(origin, direction);
 
-				scene.quads[0].Intersect(ray);
-				//scene.cubes[0].Intersect(ray);
-
-				if (scene.useQBVH)
-					scene.bvh->IntersectQBVH(ray);
-				else
-					scene.bvh->IntersectBVH(ray);
-
-				if (ray.objIdx == -1)
-					continue;
-
-				/* TODO IMPLEMNT THIS CORRECTLY FOR GPU
-				if (material.type == Material::MaterialType::LIGHT)
-				{
-					if (lastSpecular)
-						return  material.emission;
-
-					break;
-				}*/
-
-				Material material = scene.GetMaterial(ray.objIdx);
-				if (material.type == Material::MaterialType::LIGHT)
-				{
-					continue;
-				}
-
-				distances[counter] = ray.t;
-				primIdxs[counter] = ray.objIdx;
-
-				origins[counter] = origins[i];
-				directions[counter] = directions[i];
-				pixelIdxs[counter] = pixelIdxs[i];
-
-
-				counter += 1;
-			}
-
-			if (counter == 0)
-				return;
-
-			rayCounter[0] = counter;
-
-			distanceBuffer->CopyToDevice(false);
-			primIdxBuffer->CopyToDevice(false);
-			originBuffer->CopyToDevice(false);
-			directionBuffer->CopyToDevice(false);
-			pixelIdxBuffer->CopyToDevice(false);
-
+			rayCounter[0] = SCRWIDTH * SCRHEIGHT;
 			rayCounterBuffer->CopyToDevice(true);
+
+			extendKernel->Run(SCRWIDTH * SCRHEIGHT);
+			clFinish(Kernel::GetQueue());
 
 			shadeKernel->S(27, (int) RandomUInt()); // Give a random seed to the GPU
 
-			shadeKernel->Run(counter);
+			shadeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			bounceCounterBuffer->CopyFromDevice(false);
 
@@ -710,75 +685,18 @@ void Renderer::Tick(float deltaTime)
 				//std::cout << "bounceCounter: " << bounceCounter[0] << std::endl;
 
 				generatePrimaryRaysKernel->Run(bounceCounter[0]);
-
-				pixelIdxBuffer->CopyFromDevice(false);
-				originBuffer->CopyFromDevice(false);
-				directionBuffer->CopyFromDevice(false);
-				distanceBuffer->CopyFromDevice(false);
-				primIdxBuffer->CopyFromDevice(false);
+				clFinish(Kernel::GetQueue());
 
 				rayCounterBuffer->CopyFromDevice(true);
+				
+				extendKernel->Run(rayCounter[0]);
 				clFinish(Kernel::GetQueue());
-				int counter = 0;
-				for (int i = 0; i < rayCounter[0]; i++)
-				{
-					float3 origin = float3(origins[i].x, origins[i].y, origins[i].z);
-					float3 direction = float3(directions[i].x, directions[i].y, directions[i].z);
-					Ray ray = Ray(origin, direction);
-
-					scene.quads[0].Intersect(ray);
-					//scene.cubes[0].Intersect(ray);
-
-					if (scene.useQBVH)
-						scene.bvh->IntersectQBVH(ray);
-					else
-						scene.bvh->IntersectBVH(ray);
-
-					if (ray.objIdx == -1)
-						continue;
-
-					/* TODO IMPLEMNT THIS CORRECTLY FOR GPU
-					if (material.type == Material::MaterialType::LIGHT)
-					{
-						if (lastSpecular)
-							return  material.emission;
-
-						break;
-					}*/
-					Material material = scene.GetMaterial(ray.objIdx);
-					if (material.type == Material::MaterialType::LIGHT)
-					{
-						continue;
-					}
-
-					distances[counter] = ray.t;
-					primIdxs[counter] = ray.objIdx;
-
-					origins[counter] = origins[i];
-					directions[counter] = directions[i];
-					pixelIdxs[counter] = pixelIdxs[i];
-
-
-					counter++;
-				}
-				if (counter == 0)
-					break;
-
-				rayCounter[0] = counter;
-
-				distanceBuffer->CopyToDevice(false);
-				primIdxBuffer->CopyToDevice(false);
-				originBuffer->CopyToDevice(false);
-				directionBuffer->CopyToDevice(false);
-				pixelIdxBuffer->CopyToDevice(false);
-
-				rayCounterBuffer->CopyToDevice(true);
 				
 				shadeKernel->S(27, (int)RandomUInt()); // Give a random seed to the GPU
-				
-				shadeKernel->Run(counter);
+				shadeKernel->Run(rayCounter[0]);
 				
 				bounceCounterBuffer->CopyFromDevice(false);
+
 				shadowCounterBuffer->CopyFromDevice(false);
 				shadowPixelIdxBuffer->CopyFromDevice(false);
 				shadowOriginBuffer->CopyFromDevice(false);
@@ -811,7 +729,6 @@ void Renderer::Tick(float deltaTime)
 				}
 
 				accumulatorBuffer->CopyToDevice(true);
-				
 			}
 			std::cout << "loop count:" << loop << std::endl;
 
