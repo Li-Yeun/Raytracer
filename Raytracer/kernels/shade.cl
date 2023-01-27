@@ -54,7 +54,7 @@ float4 GetAlbedo(float4 I, float4 N, __global uint* texture)
 }
 
 __kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, // Primary Rays
-__global float4* albedos, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture,                                                         // Primitives
+__global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture,                                                         // Primitives
 __global float4* lightCorners, float A, float s, float4 emission,                                                                                                                // Light Source(s)
 __global float4* energies, __global float4* transmissions,                                                                                                                       // E & T
 __global int* shadowCounter, __global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,                  // Shadow Rays
@@ -72,7 +72,8 @@ int seed)  // Maybe make seed a pointer and atomically increment it after creati
         return;
 
      // TODO CHECK IF MATERIAL IS LIGHT (PROBABLY DO THIS IN EXTEND KERNEL ALREADY)
-
+    if(materials[primIdxs[threadId]] == 4) // IF MAT IS A LIGHT SOURCE
+        return;
     
     float4 I = origins[threadId] + directions[threadId] * distances[threadId];
     float4 N;

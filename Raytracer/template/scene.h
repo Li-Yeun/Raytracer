@@ -77,9 +77,9 @@ public:
 
         std::cout << "Loading objects ..." << std::endl;
 
-        LoadObject("assets/pyramid.obj", glass_mat, float3(0, 0, 1.5));
-        //LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
-        //LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj", glass_mat, float3(0, 0, 1.5));
+        LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
 
         bvh = new BVH(spheres, spheres_size, planes, planes_size, triangles, triangles_size);
         SetTime( 0 );
@@ -95,10 +95,7 @@ public:
         quadMatrices = new mat4[quads_size];
         quadSizes = new float[quads_size];
         sphereInfos = new float4[spheres_size];
-        triangleInfos1 = new float4[triangles_size];
-        triangleInfos2 = new float4[triangles_size];
-        triangleInfos3 = new float4[triangles_size];
-
+        triangleInfos = new float4[triangles_size * 3];
         // Normals
         primitives = new float4[totalPrimitives];
         sphereInvrs = new float[spheres_size];
@@ -156,9 +153,9 @@ public:
             if (i >= upperLimit)
             {
                 primMaterials[i] = (int)triangles[i - upperLimit].material.type;
-                triangleInfos1[i - upperLimit] = float4(triangles[i - upperLimit].pos1, 0.0f);
-                triangleInfos2[i - upperLimit] = float4(triangles[i - upperLimit].pos2, 0.0f);
-                triangleInfos3[i - upperLimit] = float4(triangles[i - upperLimit].pos3, 0.0f);
+                triangleInfos[(i - upperLimit) * 3] = float4(triangles[i - upperLimit].pos1, 0.0f);
+                triangleInfos[(i - upperLimit) * 3 + 1] = float4(triangles[i - upperLimit].pos2, 0.0f);
+                triangleInfos[(i - upperLimit) * 3 + 2] = float4(triangles[i - upperLimit].pos3, 0.0f);
 
                 primitives[i] = float4(triangles[i - upperLimit].N, 0);
                 albedos[i] = float4(triangles[i - upperLimit].material.color, 0);
@@ -170,9 +167,7 @@ public:
         quadMatrixBuffer = new Buffer(quads_size * sizeof(mat4), quadMatrices, 0);
         quadSizeBuffer = new Buffer(quads_size * sizeof(float), quadSizes, 0);
         sphereInfoBuffer = new Buffer(spheres_size * sizeof(float4), sphereInfos, 0);
-        triangleInfo1Buffer = new Buffer(triangles_size * sizeof(float4), triangleInfos1, 0);
-        triangleInfo2Buffer = new Buffer(triangles_size * sizeof(float4), triangleInfos2, 0);
-        triangleInfo3Buffer = new Buffer(triangles_size * sizeof(float4), triangleInfos3, 0);
+        triangleInfoBuffer = new Buffer(triangles_size * 3 * sizeof(float4), triangleInfos, 0);
 
         // Normals
         primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , 0);
@@ -566,17 +561,13 @@ public:
     float* quadSizes;
     float4* sphereInfos;
     // TODO CUBES
-    float4* triangleInfos1;
-    float4* triangleInfos2;
-    float4* triangleInfos3;
+    float4* triangleInfos;
   
     static inline Buffer* primMaterialBuffer;
     static inline Buffer* quadMatrixBuffer;
     static inline Buffer* quadSizeBuffer;
     static inline Buffer* sphereInfoBuffer;
-    static inline Buffer* triangleInfo1Buffer;
-    static inline Buffer* triangleInfo2Buffer;
-    static inline Buffer* triangleInfo3Buffer;
+    static inline Buffer* triangleInfoBuffer;
     // Normals
     float4* primitives;
     float* sphereInvrs;

@@ -7,20 +7,13 @@ float3 rayO;
 float3 rayD;
 */
 
-/*
-// Multiply a 4x4 matrix by a 4x1 vector
-float4 MultiplyMatrix(float4 a, float16 matrix)
+// Multiply a 4x4 matrix by a 4x1 vector and convert it to a 3x1 vector
+float3 MultiplyMatrix(float4 b, float16 a)
 {
-    float4 result = (float4)(0, 0, 0, 0);
-    for (int i = 0; i < 4; i++)
-    {
-        result.x += a[i] * matrix[i];
-        result.y += a[i] * matrix[i + 4];
-        result.z += a[i] * matrix[i + 8];
-        result.w += a[i] * matrix[i + 12];
-    }
-    return (float4)result;
-}*/
+    return (float3)(a.s0 * b.x + a.s1 * b.y + a.s2 * b.z + a.s3 * b.w,
+        a.s4 * b.x + a.s5 * b.y + a.s6 * b.z + a.s7 * b.w,
+		a.s8 * b.x + a.s9 * b.y + a.sA * b.z + a.sB * b.w);
+}
 
 /*
 bool IntersectAABB(const float4 rayOrigin, const float4 rayDirection, const float rayDistance, const float4 bmin, const float4 bmax)
@@ -110,7 +103,7 @@ void triangleIntersect(int objIdx, float3 pos1, float3 pos2, float3 pos3)
 
 __kernel void Extend(__global int* rayCounter, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,   // Primary Rays
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos1, __global float4* triangleInfos2,__global float4* triangleInfos3)
+__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos)
 {
     int threadId = get_global_id(0);
 
@@ -128,8 +121,22 @@ __global float16* quadMatrices, __global float* quadSizes, __global float4* sphe
     int currentObjIdx = -1;
     for(int i = 0; i < quads_size; i++)
     {
-        //TODO
         currentObjIdx += 1;
+        //TODO
+        float3 O = MultiplyMatrix((float4)(rayO, 1), quadMatrices[i]);
+        float3 D = MultiplyMatrix((float4)(rayD, 0), quadMatrices[i]);
+        float t = O.y / -D.y;
+
+        if (t < rayT && t > 0)
+        {
+            float3 I = O + t * D;
+            if (I.x > -quadSizes[i] && I.x < quadSizes[i] && I.z > -quadSizes[i] && I.z < quadSizes[i])
+            {
+                rayT = t; 
+                rayObjIdx = currentObjIdx;
+            }
+        }
+        
         //QuadIntersect();
     }
 
@@ -181,7 +188,8 @@ __global float16* quadMatrices, __global float* quadSizes, __global float4* sphe
         float t = -(dot(rayO, N) + d) / (dot(rayD, N));
 
         if (t < rayT && t > 0) 
-        {   rayT = t;
+        {   
+            rayT = t;
             rayObjIdx = currentObjIdx;
         }
         /*
@@ -193,9 +201,9 @@ __global float16* quadMatrices, __global float* quadSizes, __global float4* sphe
     for (int i = 0; i < triangles_size; i++)
     {
         currentObjIdx += 1;
-        float3 pos1 = triangleInfos1[i].xyz;
-        float3 pos2 = triangleInfos2[i].xyz;
-        float3 pos3 = triangleInfos3[i].xyz;
+        float3 pos1 = triangleInfos[i * 3].xyz;
+        float3 pos2 = triangleInfos[i * 3 + 1].xyz;
+        float3 pos3 = triangleInfos[i * 3 + 2].xyz;
 
         // No intersection if ray and plane are parallel
         float3 edge1 = pos2 - pos1;
