@@ -590,6 +590,12 @@ void Renderer::Tick(float deltaTime)
 		shadowDirectionBuffer->CopyToDevice(false);
 		shadowDistanceBuffer->CopyToDevice(true);
 
+		connectKernel->SetArguments(shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
+			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			energyBuffer, accumulatorBuffer
+		);
+
 		firstTick = false;
 	}
 	// animation
@@ -604,77 +610,25 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
-			// TODO: DO SOMETHING SMARTER TO RESET COUNTER
-			/*
-			rayCounter[0] = SCRWIDTH * SCRHEIGHT;
-			bounceCounter[0] = 0;
-			shadowCounter[0] = 0;
-
-			rayCounterBuffer->CopyToDevice(false);
-			bounceCounterBuffer->CopyToDevice(false);
-			shadowCounterBuffer->CopyToDevice(true);
-			*/
-
 			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
 			generateInitialPrimaryRaysKernel->S(8, float4(camera->camPos, 0));
-
 			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			// DEL
-			pixelIdxBuffer->CopyFromDevice(false);
-			originBuffer->CopyFromDevice(false);
-			directionBuffer->CopyFromDevice(false);
-			distanceBuffer->CopyFromDevice(false);
-			primIdxBuffer->CopyFromDevice(true);
-
-			clFinish(Kernel::GetQueue());
-
-			rayCounter[0] = SCRWIDTH * SCRHEIGHT;
+			// TODO DO SOMETHING SMARTER TO RESET COUNTER
+			rayCounter[0] = SCRWIDTH * SCRHEIGHT; 
 			rayCounterBuffer->CopyToDevice(true);
 
 			extendKernel->Run(SCRWIDTH * SCRHEIGHT);
-			clFinish(Kernel::GetQueue());
 
 			shadeKernel->S(28, (int) RandomUInt()); // Give a random seed to the GPU
-
 			shadeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			bounceCounterBuffer->CopyFromDevice(false);
+			shadowCounterBuffer->CopyFromDevice(true);
 
-			shadowCounterBuffer->CopyFromDevice(false);
-			shadowPixelIdxBuffer->CopyFromDevice(false);
-			shadowOriginBuffer->CopyFromDevice(false);
-			shadowDirectionBuffer->CopyFromDevice(false);
-			shadowDistanceBuffer->CopyFromDevice(false);
-
-			energyBuffer->CopyFromDevice(true);
-
-			clFinish(Kernel::GetQueue());
-			std::cout <<  "InitialShadowCounter:" << shadowCounter[0] << std::endl;
-			for (int i = 0; i < shadowCounter[0]; i++)
-			{
-				float3 shadowOrigin = float3(shadowOrigins[i].x, shadowOrigins[i].y, shadowOrigins[i].z);
-				float3 shadowDirection = float3(shadowDirections[i].x, shadowDirections[i].y, shadowDirections[i].z);
-
-				Ray ray = Ray(shadowOrigin, shadowDirection, shadowDistances[i]);
-
-				scene.quads[0].Intersect(ray);
-				//scene.cubes[0].Intersect(ray);
-
-				bool isOccluded;
-				if (scene.useQBVH)
-					isOccluded = scene.bvh->IntersectQBVHShadowRay(ray, ray.objIdx != -1);
-				else
-					isOccluded = scene.bvh->IntersectBVHShadowRay(ray, ray.objIdx != -1);
-
-				if (!isOccluded)
-				{
-					accumulator[shadowPixelIdxs[i]] += energies[i];
-				}
-			}
-
-			accumulatorBuffer->CopyToDevice(true);
-			std::cout << "InitialbounceCounter: " << bounceCounter[0] << std::endl;
+			extendKernel->Run(shadowCounter[0]);
+		
+			//std::cout << "InitialbounceCounter: " << bounceCounter[0] << std::endl;
 
 			int loop = 0;
 			while (bounceCounter[0] > 0)
@@ -683,65 +637,21 @@ void Renderer::Tick(float deltaTime)
 				//std::cout << "bounceCounter: " << bounceCounter[0] << std::endl;
 
 				generatePrimaryRaysKernel->Run(bounceCounter[0]);
-				clFinish(Kernel::GetQueue());
 
 				rayCounterBuffer->CopyFromDevice(true);
 				
 				extendKernel->Run(rayCounter[0]);
-				clFinish(Kernel::GetQueue());
 				
 				shadeKernel->S(28, (int)RandomUInt()); // Give a random seed to the GPU
 				shadeKernel->Run(rayCounter[0]);
 				
 				bounceCounterBuffer->CopyFromDevice(false);
+				shadowCounterBuffer->CopyFromDevice(true);
 
-				shadowCounterBuffer->CopyFromDevice(false);
-				shadowPixelIdxBuffer->CopyFromDevice(false);
-				shadowOriginBuffer->CopyFromDevice(false);
-				shadowDirectionBuffer->CopyFromDevice(false);
-				shadowDistanceBuffer->CopyFromDevice(false);
-
-				energyBuffer->CopyFromDevice(true);
-				clFinish(Kernel::GetQueue());
-
-				for (int i = 0; i < shadowCounter[0]; i++)
-				{
-					float3 shadowOrigin = float3(shadowOrigins[i].x, shadowOrigins[i].y, shadowOrigins[i].z);
-					float3 shadowDirection = float3(shadowDirections[i].x, shadowDirections[i].y, shadowDirections[i].z);
-
-					Ray ray = Ray(shadowOrigin, shadowDirection, shadowDistances[i]);
-
-					scene.quads[0].Intersect(ray);
-					//scene.cubes[0].Intersect(ray);
-
-					bool isOccluded;
-					if (scene.useQBVH)
-						isOccluded = scene.bvh->IntersectQBVHShadowRay(ray, ray.objIdx != -1);
-					else
-						isOccluded = scene.bvh->IntersectBVHShadowRay(ray, ray.objIdx != -1);
-
-					if (!isOccluded)
-					{
-						accumulator[shadowPixelIdxs[i]] += energies[i];
-					}
-				}
-
-				accumulatorBuffer->CopyToDevice(true);
+				connectKernel->Run(shadowCounter[0]);
 			}
-			std::cout << "loop count:" << loop << std::endl;
+			//std::cout << "loop count:" << loop << std::endl;
 
-			/*
-			int co = 0;
-			for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
-			{
-				if (magnitude(accumulator[i]) == 0)
-				{
-					co++;
-					std::cout << "pixel: " << i << std::endl;
-				}
-			}
-			std::cout << "totalpixel: " << co << std::endl;
-			*/
 			finalizeKernel->S(2, (int) accumulatedFrames);
 			finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
