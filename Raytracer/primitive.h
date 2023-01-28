@@ -104,7 +104,6 @@ namespace Tmpl8 {
         Sphere() = default;
         Sphere(int idx, float3 p, float r, Material mat) :
             pos(p), r(r), r2(r* r), invr(1 / r), objIdx(idx), material(mat) {
-            N = GetNormal(float3(0));
         }
         void Intersect(Ray& ray) const
         {
@@ -140,8 +139,6 @@ namespace Tmpl8 {
         int objIdx = -1;
         Material material;
         
-        // DELETE LATER
-        float3 N;
     };
 
     // -----------------------------------------------------------

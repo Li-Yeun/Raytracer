@@ -122,7 +122,7 @@ public:
                 primMaterials[i] = (int) spheres[i - lowerLimit].material.type;
                 sphereInfos[i - lowerLimit] = float4(spheres[i - lowerLimit].pos, spheres[i - lowerLimit].r2);
 
-                primitives[i] = float4(spheres[i - lowerLimit].N, 0);
+                primitives[i] = float4(spheres[i - lowerLimit].pos, 0);
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
                 albedos[i] = float4(spheres[i - lowerLimit].material.color, 0);
             }
