@@ -626,7 +626,7 @@ void Renderer::Tick(float deltaTime)
 			bounceCounterBuffer->CopyFromDevice(false);
 			shadowCounterBuffer->CopyFromDevice(true);
 
-			extendKernel->Run(shadowCounter[0]);
+			connectKernel->Run(shadowCounter[0]);
 		
 			//std::cout << "InitialbounceCounter: " << bounceCounter[0] << std::endl;
 
