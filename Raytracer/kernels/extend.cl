@@ -103,7 +103,7 @@ void triangleIntersect(int objIdx, float3 pos1, float3 pos2, float3 pos3)
 
 __kernel void Extend(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,   // Primary Rays
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global __read_only float16* quadMatrices, __global __read_only float* quadSizes, __global __read_only float4* sphereInfos, __global __read_only float4* primNorms, __global __read_only float4* triangleInfos)
+__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos)
 {
     int threadId = get_global_id(0);
 
