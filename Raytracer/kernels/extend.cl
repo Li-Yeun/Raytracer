@@ -101,9 +101,9 @@ void triangleIntersect(int objIdx, float3 pos1, float3 pos2, float3 pos3)
     }
 }*/
 
-__kernel void Extend(__global int* rayCounter, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,   // Primary Rays
+__kernel void Extend(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,   // Primary Rays
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos)
+__global __read_only float16* quadMatrices, __global __read_only float* quadSizes, __global __read_only float4* sphereInfos, __global __read_only float4* primNorms, __global __read_only float4* triangleInfos)
 {
     int threadId = get_global_id(0);
 
@@ -112,11 +112,13 @@ __global float16* quadMatrices, __global float* quadSizes, __global float4* sphe
         return;
     }
 
-    float rayT = distances[threadId];
-    int rayObjIdx = primIdxs[threadId];
+    int rayPixelIdx = pixelIdxs[threadId];
 
-    float3 rayO = origins[threadId].xyz;
-    float3 rayD = directions[threadId].xyz;
+    float rayT = INFINITY;
+    int rayObjIdx = -1;
+
+    float3 rayO = origins[rayPixelIdx].xyz;
+    float3 rayD = directions[rayPixelIdx].xyz;
 
     int currentObjIdx = -1;
     for(int i = 0; i < quads_size; i++)
@@ -236,6 +238,6 @@ __global float16* quadMatrices, __global float* quadSizes, __global float4* sphe
         */
     }
 
-    distances[threadId] = rayT;
-    primIdxs[threadId] = rayObjIdx;
+    distances[rayPixelIdx] = rayT;
+    primIdxs[rayPixelIdx] = rayObjIdx;
 }

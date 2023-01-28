@@ -59,7 +59,7 @@ public:
 
         spheres_size = 2;
         spheres = new Sphere[spheres_size]{ 
-            Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, absorb_all_but_blue_mat),                             // 1: bouncing ball
+            Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, cyan_mat),                             // 1: bouncing ball
             Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners		
 
         cubes_size = 1;
@@ -163,23 +163,23 @@ public:
 
         }
         // Intersections
-        primMaterialBuffer = new Buffer(totalPrimitives * sizeof(int), primMaterials, 0);
-        quadMatrixBuffer = new Buffer(quads_size * sizeof(mat4), quadMatrices, 0);
-        quadSizeBuffer = new Buffer(quads_size * sizeof(float), quadSizes, 0);
-        sphereInfoBuffer = new Buffer(spheres_size * sizeof(float4), sphereInfos, 0);
-        triangleInfoBuffer = new Buffer(triangles_size * 3 * sizeof(float4), triangleInfos, 0);
+        primMaterialBuffer = new Buffer(totalPrimitives * sizeof(int), primMaterials, CL_MEM_READ_ONLY);
+        quadMatrixBuffer = new Buffer(quads_size * sizeof(mat4), quadMatrices, CL_MEM_READ_ONLY);
+        quadSizeBuffer = new Buffer(quads_size * sizeof(float), quadSizes, CL_MEM_READ_ONLY);
+        sphereInfoBuffer = new Buffer(spheres_size * sizeof(float4), sphereInfos, CL_MEM_READ_ONLY);
+        triangleInfoBuffer = new Buffer(triangles_size * 3 * sizeof(float4), triangleInfos, CL_MEM_READ_ONLY);
 
         // Normals
-        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , 0);
-        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, 0);
-        albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, 0);//CL_MEM_READ_ONLY);
+        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , CL_MEM_READ_ONLY);
+        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, CL_MEM_READ_ONLY);
+        albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, CL_MEM_READ_ONLY);
 
         float4* lights = new float4[3]{ float4(quads[0].c1,0), float4(quads[0].c2, 0), float4(quads[0].c3, 0) };
-        lightBuffer = new Buffer(1 * 3 * sizeof(float4), lights, 0);
+        lightBuffer = new Buffer(1 * 3 * sizeof(float4), lights, CL_MEM_READ_ONLY);
 
 
         static Surface logo("assets/logo.png");
-        textureBuffer = new Buffer(logo.width * logo.height * sizeof(uint), logo.pixels, 0); // Todo set this as texture memory
+        textureBuffer = new Buffer(logo.width * logo.height * sizeof(uint), logo.pixels, CL_MEM_READ_ONLY); // Todo set this as texture memory
 
         isInitialized = true;
     }

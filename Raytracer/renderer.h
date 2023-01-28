@@ -94,10 +94,7 @@ public:
 	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
 
-	// DELETE LATER
-	float4* origins, *directions;
-	float* distances;
-	int* primIdxs, *rayCounter, *pixelIdxs;
+	int* rayCounter;
 
 	// Ray Buffers
 	static inline Buffer* rayCounterBuffer;
@@ -107,17 +104,11 @@ public:
 	static inline Buffer* distanceBuffer;
 	static inline Buffer* primIdxBuffer;
 
-	// DELETE LATER
-	float4* energies, *transmissions;
-
 	// E & T
 	static inline Buffer* energyBuffer;
 	static inline Buffer* transmissionBuffer;
 
-	// DELETE LATER
-	float4* shadowOrigins, *shadowDirections;
-	float* shadowDistances;
-	int* shadowCounter, *shadowPixelIdxs;
+	int* shadowCounter;
 
 	// Shadow Ray Buffers
 	static inline Buffer* shadowCounterBuffer;
@@ -126,14 +117,13 @@ public:
 	static inline Buffer* shadowDirectionBuffer;
 	static inline Buffer* shadowDistanceBuffer;
 
-	// DELETE LATER
 	int* bounceCounter;
 
 	// Bounce Ray Buffers
 	static inline Buffer* bounceCounterBuffer;
 	static inline Buffer* bouncePixelIdxBuffer;
-	static inline Buffer* bounceOriginBuffer;
-	static inline Buffer* bounceDirectionBuffer;
+
+	static inline Buffer* seedBuffer;
 };
 
 } // namespace Tmpl8

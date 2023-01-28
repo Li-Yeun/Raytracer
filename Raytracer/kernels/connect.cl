@@ -7,7 +7,7 @@ float3 MultiplyMatrix(float4 b, float16 a)
 
 __kernel void Connect(__global int* shadowCounter, __global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos,
+__global __read_only float16* quadMatrices, __global __read_only float* quadSizes, __global __read_only float4* sphereInfos, __global __read_only float4* primNorms, __global __read_only float4* triangleInfos,
 __global float4* energies, __global float4* accumulator)
 {
     int threadId = get_global_id(0);
