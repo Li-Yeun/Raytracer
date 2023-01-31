@@ -81,8 +81,8 @@ public:
 	}
 
 	//Kernels
-	static inline Kernel* generateInitialPrimaryRaysKernel;
 	static inline Kernel* generatePrimaryRaysKernel;
+	static inline Kernel* initialExtendKernel;
 	static inline Kernel* extendKernel;
 	static inline Kernel* shadeKernel;
 	static inline Kernel* connectKernel;
@@ -94,10 +94,7 @@ public:
 	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
 
-	int* rayCounter;
-
 	// Ray Buffers
-	static inline Buffer* rayCounterBuffer;
 	static inline Buffer* pixelIdxBuffer;
 	static inline Buffer* originBuffer;
 	static inline Buffer* directionBuffer;

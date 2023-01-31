@@ -11,8 +11,8 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 
 	// Create Kernels
-	generateInitialPrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GenerateInitialPrimaryRays");
 	generatePrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GeneratePrimaryRays");
+	initialExtendKernel = new Kernel("Kernels/extend.cl", "InitialExtend");
 	extendKernel = new Kernel("Kernels/extend.cl", "Extend");
 	shadeKernel = new Kernel("Kernels/shade.cl", "Shade");
 	connectKernel = new Kernel("Kernels/connect.cl", "Connect");
@@ -22,11 +22,7 @@ void Renderer::Init()
 	deviceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), screen->pixels, CL_MEM_WRITE_ONLY);
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
 
-	// DELETE LATER
-	rayCounter = new int[1]{ SCRWIDTH * SCRHEIGHT };
-
 	// Primary Ray Buffers
-	rayCounterBuffer = new Buffer(1 * sizeof(int), rayCounter, 0);
 	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
@@ -60,14 +56,8 @@ void Renderer::Init()
 	seedBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), seeds, 0);
 
 	// Set Kernel Arguments
-	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
+	generatePrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
 	energyBuffer, transmissionBuffer);																						
-
-	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, 
-		shadowBounceCounterBuffer, bouncePixelIdxBuffer);
-
-	rayCounterBuffer->CopyToDevice(false);
-	shadowBounceCounterBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 
@@ -586,7 +576,7 @@ void Renderer::Tick(float deltaTime)
 	if (firstTick)
 	{
 
-		extendKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+		initialExtendKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
 		scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
 		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 		scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer);
@@ -599,8 +589,16 @@ void Renderer::Tick(float deltaTime)
 		scene.bvhNodesBuffer->CopyToDevice(false);
 		scene.bvhPrimitiveIdxBuffer->CopyToDevice(false);
 
+		extendKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
+			shadowBounceCounterBuffer, bouncePixelIdxBuffer);
+
+		shadowBounceCounterBuffer->CopyToDevice(false);
+
 		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
-		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
+		shadeKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
 			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
@@ -643,15 +641,16 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
-			generateInitialPrimaryRaysKernel->S(9, camera->aspect);
-			generateInitialPrimaryRaysKernel->S(10, float4(camera->camPos, 0));
-			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+			if (shadowBounceCounter[0] > 0)
+			{
+				shadowBounceCounter[0] = 0;
+				shadowBounceCounterBuffer->CopyToDevice(true);
+			}
+			generatePrimaryRaysKernel->S(9, camera->aspect);
+			generatePrimaryRaysKernel->S(10, float4(camera->camPos, 0));
+			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			// TODO DO SOMETHING SMARTER TO RESET COUNTER
-			rayCounter[0] = SCRWIDTH * SCRHEIGHT; 
-			rayCounterBuffer->CopyToDevice(true);
-
-			extendKernel->Run(SCRWIDTH * SCRHEIGHT);
+			initialExtendKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			shadeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
@@ -661,8 +660,6 @@ void Renderer::Tick(float deltaTime)
 
 			while (shadowBounceCounter[1] > 0)
 			{
-				generatePrimaryRaysKernel->Run(shadowBounceCounter[1]);
-				
 				extendKernel->Run(shadowBounceCounter[1]);
 				
 				shadeKernel->Run(shadowBounceCounter[1]);
