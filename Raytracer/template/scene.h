@@ -48,16 +48,22 @@ public:
         light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(2.0f));
 
 
+        mat4 M1base = mat4::Translate(float3(0, 2.6f, 2));
+        mat4 M1 = M1base * mat4::RotateZ(sinf(0 * 0.6f) * 0.1f) * mat4::Translate(float3(0, -0.9, 0));
+
+        mat4 M2base = mat4::RotateX(PI / 4) * mat4::RotateZ(PI / 4);
+        mat4 M2 = mat4::Translate(float3(1.4f, 0, 2)) * mat4::RotateY(0 * 0.5f) * M2base;
+
         quads_size = 1;
-        quads = new Quad[quads_size] { Quad(id++, 3, light_mat) };                              // 0: light source
-                  
+        quads = new Quad[quads_size] { Quad(id++, 3, light_mat, M1) };                              // 0: light source
+
         spheres_size = 2;
         spheres = new Sphere[spheres_size]{ 
-            Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, absorb_all_but_blue_mat),                             // 1: bouncing ball
+            Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, cyan_mat),                             // 1: bouncing ball
             Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners		
 
         cubes_size = 1;
-        cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(0.75f), def_mat) };         // 3: cube
+        cubes = new Cube[cubes_size] { Cube(id++, float3(0), float3(0.75f), def_mat, M2) };         // 3: cube
                
         planes_size = 6;                                                                                                
         planes = new Plane[planes_size]{
@@ -81,7 +87,107 @@ public:
         // hierarchy: virtuals reduce performance somewhat.
 
         std::cout << std::endl << triangles_size << " Triangles loaded" << std::endl << std::endl << std::endl;
+
+        int totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
+        
+        //  Intersections
+        primMaterials = new int[totalPrimitives];
+        quadMatrices = new mat4[quads_size];
+        quadSizes = new float[quads_size];
+        sphereInfos = new float4[spheres_size];
+        triangleInfos = new float4[triangles_size * 3];
+        // Normals
+        primitives = new float4[totalPrimitives];
+        sphereInvrs = new float[spheres_size];
+        albedos = new float4[totalPrimitives];
+
+        for (int i = 0; i < totalPrimitives; i++)
+        {
+            int lowerLimit = 0;
+            int upperLimit = quads_size;
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primMaterials[i] = (int) quads[i].material.type;
+                quadMatrices[i] = quads[i].invT;
+                quadSizes[i] = quads[i].size;
+
+                primitives[i] = float4(quads[i].N, 0);
+                albedos[i] = float4(quads[i].material.color, 0);
+            }
+
+            lowerLimit = upperLimit;
+            upperLimit += spheres_size;
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primMaterials[i] = (int) spheres[i - lowerLimit].material.type;
+                sphereInfos[i - lowerLimit] = float4(spheres[i - lowerLimit].pos, spheres[i - lowerLimit].r2);
+
+                primitives[i] = float4(spheres[i - lowerLimit].pos, 0);
+                sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
+                albedos[i] = float4(spheres[i - lowerLimit].material.color, 0);
+            }
+
+            lowerLimit = upperLimit;
+            upperLimit += cubes_size;
+
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primMaterials[i] = (int) cubes[i - lowerLimit].material.type;
+
+                // TODO CHANGE AND DELETE LATER
+                primitives[i] = float4(0);
+                albedos[i] = float4(0);
+            }
+
+            lowerLimit = upperLimit;
+            upperLimit += planes_size;
+
+            if (i >= lowerLimit && i < upperLimit)
+            {
+                primMaterials[i] = (int)planes[i - lowerLimit].material.type;
+
+                primitives[i] = float4(planes[i - lowerLimit].N, planes[i - lowerLimit].d);
+                albedos[i] = float4(planes[i - lowerLimit].material.color, 0);
+            }
+
+            if (i >= upperLimit)
+            {
+                primMaterials[i] = (int)triangles[i - upperLimit].material.type;
+                triangleInfos[(i - upperLimit) * 3] = float4(triangles[i - upperLimit].pos1, 0.0f);
+                triangleInfos[(i - upperLimit) * 3 + 1] = float4(triangles[i - upperLimit].pos2, 0.0f);
+                triangleInfos[(i - upperLimit) * 3 + 2] = float4(triangles[i - upperLimit].pos3, 0.0f);
+
+                primitives[i] = float4(triangles[i - upperLimit].N, 0);
+                albedos[i] = float4(triangles[i - upperLimit].material.color, 0);
+            }
+
+        }
+        // Intersections
+        primMaterialBuffer = new Buffer(totalPrimitives * sizeof(int), primMaterials, CL_MEM_READ_ONLY);
+        quadMatrixBuffer = new Buffer(quads_size * sizeof(mat4), quadMatrices, CL_MEM_READ_ONLY);
+        quadSizeBuffer = new Buffer(quads_size * sizeof(float), quadSizes, CL_MEM_READ_ONLY);
+        sphereInfoBuffer = new Buffer(spheres_size * sizeof(float4), sphereInfos, CL_MEM_READ_ONLY);
+        triangleInfoBuffer = new Buffer(triangles_size * 3 * sizeof(float4), triangleInfos, CL_MEM_READ_ONLY);
+
+        // Normals
+        primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , CL_MEM_READ_ONLY);
+        sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, CL_MEM_READ_ONLY);
+        albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, CL_MEM_READ_ONLY);
+
+        float4* lights = new float4[3]{ float4(quads[0].c1,0), float4(quads[0].c2, 0), float4(quads[0].c3, 0) };
+        lightBuffer = new Buffer(1 * 3 * sizeof(float4), lights, CL_MEM_READ_ONLY);
+
+
+        static Surface logo("assets/logo.png");
+        textureBuffer = new Buffer(logo.width * logo.height * sizeof(uint), logo.pixels, CL_MEM_READ_ONLY); // Todo set this as texture memory
+
+        //BVH Buffers
+        bvhNodesBuffer = new Buffer(((spheres_size + triangles_size) * 2 + 1) * sizeof(GPUBVHNode), bvh->gpuBvhNode);
+        bvhPrimitiveIdxBuffer = new Buffer((spheres_size + triangles_size) * sizeof(int), bvh->primitiveIdx);
+
+        isInitialized = true;
     }
+        
     void LoadObject(std::string inputfile, Material material, float3 transform = float3(0))
     {
         std::cout << "Loading: " << inputfile << std::endl;
@@ -154,6 +260,7 @@ public:
     }
     void SetTime( float t )
     {
+        return;
         // default time for the scene is simply 0. Updating/ the time per frame
         // enables animation. Updating it per ray can be used for motion blur.
         animTime = 0;
@@ -161,6 +268,7 @@ public:
         
 
         if (isDynamic) animTime = t;
+
         // light source animation: swing
         mat4 M1base = mat4::Translate( float3( 0, 2.6f, 2 ) );
         mat4 M1 = M1base * mat4::RotateZ( sinf( animTime * 0.6f ) * 0.1f ) * mat4::Translate( float3( 0, -0.9, 0 ) );
@@ -174,11 +282,38 @@ public:
         //spheres[0].pos = float3( -1.4f, -0.5f + tm, 2 );
         
     }
+
+    std::tuple<float, float3, float3, float3> RandomPointOnLight()
+    {
+        // Pick random light source
+        Quad light_source = quads[0];
+        
+        // Pick random position
+        float3 Nl = light_source.GetNormal(float3(0));
+        float A = sqrf(light_source.s);
+
+        float3 c1 = TransformPosition(float3(-light_source.size, 0, -light_source.size), light_source.T);
+        float3 c2 = TransformPosition(float3(light_source.size, 0, -light_source.size), light_source.T);
+        float3 c3 = TransformPosition(float3(light_source.size, 0, light_source.size), light_source.T);
+        
+        float3 c1c2 = normalize(c1 - c2);
+        float randomLength = RandomFloat() * light_source.s;
+        float3 u = c1c2 * randomLength;
+
+        float3 c2c3 = normalize(c3 - c2);
+        randomLength = RandomFloat() * light_source.s;
+        float3 v = c2c3 * randomLength;
+
+        float3 light_point = c2 + u + v - float3(0, 0.01f, 0);
+
+        return std::make_tuple(A, Nl, light_point, light_source.material.emission);
+    }
+
     float3 * GetLightPos()
     {
         // light point position is the middle of the swinging quad
-        float3 corner1 = TransformPosition( float3( -0.5f, 0, -0.5f ), quads[0].T );
-        float3 corner2 = TransformPosition( float3( 0.5f, 0, 0.5f ), quads[0].T );
+        float3 corner1 = TransformPosition( float3( -quads[0].size, 0, -quads[0].size), quads[0].T );
+        float3 corner2 = TransformPosition( float3( quads[0].size, 0, quads[0].size), quads[0].T );
         float3 lights[] = { (corner1 + corner2) * 0.5f - float3(0, 0.01f, 0), lightPos };
         return lights;
     }
@@ -358,7 +493,9 @@ public:
       }
 
       randomDirection = normalize(randomDirection);
-      if (dot(normal, randomDirection) < 0) randomDirection = -randomDirection;
+
+      if (dot(normal, randomDirection) < 0)
+          randomDirection = -randomDirection;
 
       return randomDirection;
     }
@@ -415,6 +552,42 @@ public:
 
     // QBVH
     bool useQBVH = true;
+
+    // Primitive Buffers
+
+    static inline Buffer* albedoBuffer;
+    static inline Buffer* textureBuffer;
+    static inline Buffer* lightBuffer;
+
+    // Intersection
+    int* primMaterials;
+    mat4* quadMatrices;
+    float* quadSizes;
+    float4* sphereInfos;
+    // TODO CUBES
+    float4* triangleInfos;
+  
+    static inline Buffer* primMaterialBuffer;
+    static inline Buffer* quadMatrixBuffer;
+    static inline Buffer* quadSizeBuffer;
+    static inline Buffer* sphereInfoBuffer;
+    static inline Buffer* triangleInfoBuffer;
+    // Normals
+    float4* primitives;
+    float* sphereInvrs;
+    float4* albedos;
+
+    static inline Buffer* primitiveBuffer;
+    static inline Buffer* sphereInvrBuffer;
+
+    //BVH Buffers
+    static inline Buffer* bvhNodesBuffer;
+    static inline Buffer* bvhPrimitiveIdxBuffer;
+
+
+
+    // Check if scene has been fully initialzed
+    bool isInitialized = false;
 };
 
 }

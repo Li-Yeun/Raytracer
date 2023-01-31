@@ -302,6 +302,8 @@ void main()
 			static float lightColor[3] = { 0, 0, 0 };
 
 			static bool useQBVH = true;
+			static bool useGPU = true;
+
 			if (app->screen)
 			{
 				// Post-Processing
@@ -374,6 +376,15 @@ void main()
 
 				if (ImGui::Combo("Visualization", &selectedVisuals, visualization_mode_text.data(), visualization_mode_text.size()))
 					app->SetVisualizationMode(visualization_mode[selectedVisuals]);
+
+				// GPU
+				if (visualization_mode[selectedVisuals] == Renderer::VisualizationMode::PathTracing)
+				{
+					if (ImGui::Checkbox("Use GPU", &useGPU))
+					{
+						app->SetGPU(useGPU);
+					}
+				}
 
 				// Anti-Aliasing
 				if (ImGui::Checkbox("Anti-aliasing (4x MSAA)", &anti_aliasing))

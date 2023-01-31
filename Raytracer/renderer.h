@@ -11,6 +11,7 @@ public:
 	void Init();
 	float3 ComputePixelColorGlass(float3 intersection, float3 normal, float3 albedo, Material& material, Ray& ray, int recursion_depth);
 	float3 Trace( Ray& ray, int recursion_depth);
+	float3 Sample(Ray& ray);
 	void Tick( float deltaTime );
 	void Shutdown() { /* implement if you want to do something on exit */ }
 	// input handling
@@ -58,7 +59,71 @@ public:
 	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
 
+	// GPU Setting
+	bool useGPU = true;
 
+	void SetGPU(bool mode) { 
+		useGPU = mode; 
+
+		// TODO Clearing frame is maybe unnecessary when GPU fully works
+
+		accumulatedFrames = 0;
+		//Clear accumulator
+#pragma omp parallel for schedule(dynamic)
+		for (int y = 0; y < SCRHEIGHT; y++)
+		{
+			// trace a primary ray for each pixel on the line
+			for (int x = 0; x < SCRWIDTH; x++)
+				accumulator[x + y * SCRWIDTH] =
+				float4(0);
+		}
+		accumulatorBuffer->CopyToDevice();
+	}
+
+	//Kernels
+	static inline Kernel* generateInitialPrimaryRaysKernel;
+	static inline Kernel* generatePrimaryRaysKernel;
+	static inline Kernel* extendKernel;
+	static inline Kernel* shadeKernel;
+	static inline Kernel* connectKernel;
+	static inline Kernel* finalizeKernel;
+
+	//Buffer
+
+	// Screen Buffers
+	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
+	static inline Buffer* accumulatorBuffer;
+
+	int* rayCounter;
+
+	// Ray Buffers
+	static inline Buffer* rayCounterBuffer;
+	static inline Buffer* pixelIdxBuffer;
+	static inline Buffer* originBuffer;
+	static inline Buffer* directionBuffer;
+	static inline Buffer* distanceBuffer;
+	static inline Buffer* primIdxBuffer;
+
+	// E & T
+	static inline Buffer* energyBuffer;
+	static inline Buffer* transmissionBuffer;
+
+	int* shadowCounter;
+
+	// Shadow Ray Buffers
+	static inline Buffer* shadowCounterBuffer;
+	static inline Buffer* shadowPixelIdxBuffer;
+	static inline Buffer* shadowOriginBuffer;
+	static inline Buffer* shadowDirectionBuffer;
+	static inline Buffer* shadowDistanceBuffer;
+
+	int* bounceCounter;
+
+	// Bounce Ray Buffers
+	static inline Buffer* bounceCounterBuffer;
+	static inline Buffer* bouncePixelIdxBuffer;
+
+	static inline Buffer* seedBuffer;
 };
 
 } // namespace Tmpl8

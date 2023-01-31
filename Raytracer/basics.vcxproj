@@ -147,6 +147,11 @@
     <ClInclude Include="template\scene.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="kernels\connect.cl" />
+    <None Include="kernels\extend.cl" />
+    <None Include="kernels\finalize.cl" />
+    <None Include="kernels\generatePrimaryRays.cl" />
+    <None Include="kernels\shade.cl" />
     <None Include="template\LICENSE" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,13 +1,83 @@
-#include "precomp.h"
+﻿#include "precomp.h"
 
 // -----------------------------------------------------------
 // Initialize the renderer
 // -----------------------------------------------------------
 void Renderer::Init()
 {
+	std::cout << sizeof(mat4) << std::endl;
 	// create fp32 rgb pixel buffer to render to
 	accumulator = (float4*)MALLOC64( SCRWIDTH * SCRHEIGHT * 16 );
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
+
+	// Create Kernels
+	generateInitialPrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GenerateInitialPrimaryRays");
+	generatePrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GeneratePrimaryRays");
+	extendKernel = new Kernel("Kernels/extend.cl", "Extend");
+	shadeKernel = new Kernel("Kernels/shade.cl", "Shade");
+	connectKernel = new Kernel("Kernels/connect.cl", "Connect");
+	finalizeKernel = new Kernel("Kernels/finalize.cl", "Finalize");
+
+	// Create Buffers
+	deviceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), screen->pixels, CL_MEM_WRITE_ONLY);
+	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
+
+	// DELETE LATER
+	rayCounter = new int[1]{ SCRWIDTH * SCRHEIGHT };
+
+	// Primary Ray Buffers
+	rayCounterBuffer = new Buffer(1 * sizeof(int), rayCounter, 0);
+	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
+	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
+	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
+	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+
+
+	// E & T Buffers
+	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
+	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
+
+	shadowCounter = new int[1]{ 0 };
+
+	// Shadow Ray Buffers
+	shadowCounterBuffer = new Buffer(1 * sizeof(int), shadowCounter, 0);
+	shadowPixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
+	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
+	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
+
+	bounceCounter = new int[1]{ 0 };
+
+	// Bounce Ray Buffers
+	bounceCounterBuffer = new Buffer(1 * sizeof(int), bounceCounter, 0);
+	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+
+	static uint* seeds = new uint[SCRWIDTH * SCRHEIGHT];
+	for (int i = 0; i < SCRWIDTH * SCRHEIGHT; i++)
+	{
+		seeds[i] = RandomUInt();
+	}
+
+	seedBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), seeds, 0);
+
+	// Set Kernel Arguments
+	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+	energyBuffer, transmissionBuffer);																						
+
+	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+		shadowCounterBuffer,																												// Shadow Rays	
+		bounceCounterBuffer, bouncePixelIdxBuffer);											    // Bounce Rays  
+
+	rayCounterBuffer->CopyToDevice(false);
+	shadowCounterBuffer->CopyToDevice(false);
+	bounceCounterBuffer->CopyToDevice(false);
+
+	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
+
+	accumulatorBuffer->CopyToDevice(false);
+	deviceBuffer->CopyToDevice(true);
+
 }
 
 /// <summary>
@@ -184,6 +254,197 @@ float3 Renderer::Trace( Ray& ray, int recursion_depth)
 	}
 }
 
+float3 Renderer::Sample(Ray& ray)
+{
+	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
+	bool lastSpecular = true;
+
+	while (1)
+	{
+		scene.FindNearest(ray);
+		if (ray.objIdx == -1) break;
+
+		Material material = scene.GetMaterial(ray.objIdx);
+
+		if (material.type == Material::MaterialType::LIGHT)
+		{
+			if (lastSpecular)
+				return  material.emission;
+
+			break;
+		}
+
+		float3 intersection = ray.O + ray.t * ray.D;
+		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
+		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+		float3 BRDF = albedo / PI;
+
+		// sample a random light source
+		std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
+
+		float A = std::get<0>(result);
+		float3 Nl = std::get<1>(result);
+		float3 light_point = std::get<2>(result);
+		float3 L = light_point - intersection;
+		float dist = magnitude(L);
+		L = normalize(L);
+
+		Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
+
+		if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
+		{
+			float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
+			float lightPDF = 1.0f / solidAngle;
+			E += T * (dot(normal, L) / lightPDF) * BRDF * std::get<3>(result);
+		}
+
+		// Russian Roulette
+		float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
+
+		if (p < RandomFloat()) 
+			break; 
+
+		T *= 1.0f / p;
+
+		// continue random walk
+		float3 R = scene.DiffuseReflection(normal);
+		float hemiPDF = 1.0f / (PI * 2.0f);
+		ray = Ray(intersection + R * 0.001f, R);
+		T *= (dot(normal, R) / hemiPDF) * BRDF;
+
+		lastSpecular = false;
+	}
+	return E;
+
+}
+/*	FULL SAMPLE CODE WITH GLASS AND MIRROR
+float3 Renderer::Sample(Ray& ray)
+{
+	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
+
+	bool lastSpecular = true;
+	float3 lastAbsorption = float3(1.0f);
+	while (1)
+	{
+		scene.FindNearest(ray);
+		if (ray.objIdx == -1) break;
+
+		Material material = scene.GetMaterial(ray.objIdx);
+		float3 intersection = ray.O + ray.t * ray.D;
+		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
+		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+		float3 BRDF = albedo / PI;
+
+		if (material.type == Material::MaterialType::LIGHT)
+		{
+			if (lastSpecular)
+				return lastAbsorption * material.emission;
+
+			break;
+		}
+		else if (material.type == Material::MaterialType::MIRROR)
+		{
+			float3 reflect_direction = ray.D - 2 * (dot(ray.D, normal)) * normal;
+			ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+			lastSpecular = true;
+		}
+		else if (material.type == Material::MaterialType::DIFFUSE)
+		{
+			// sample a random light source
+			std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
+
+			float A = std::get<0>(result);
+			float3 Nl = std::get<1>(result);
+			float3 light_point = std::get<2>(result);
+			float3 L = light_point - intersection;
+			float dist = magnitude(L);
+			L = normalize(L);
+
+			Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
+
+			if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
+			{
+				float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
+				float lightPDF = 1.0f / solidAngle;
+				E += T * (dot(normal, L) / lightPDF) * BRDF * lastAbsorption * std::get<3>(result);
+			}
+
+			// Russian Roulette
+			float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
+			if (p < RandomFloat()) break; else T *= 1.0f / p;
+
+			// continue random walk
+			float3 R = scene.DiffuseReflection(normal);
+			float hemiPDF = 1.0f / (PI * 2.0f);
+			ray = Ray(intersection + R * 0.001f, R);
+			T *= (dot(normal, R) / hemiPDF) * BRDF * lastAbsorption;
+
+			lastSpecular = false;
+			lastAbsorption = float3(1.0f);
+		}
+		else if (material.type == Material::MaterialType::GLASS)
+		{
+			// Compute Refraction & Absoption
+			float air_refractive_index = 1.0003f;
+			float n1, n2, refraction_ratio;
+
+			float3 absorption = float3(1.0f);
+			if (ray.inside)
+			{
+				absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z * ray.t));
+				n1 = material.refractive_index;
+				n2 = air_refractive_index;
+			}
+			else
+			{
+				n1 = air_refractive_index;
+				n2 = material.refractive_index;
+			}
+
+			refraction_ratio = n1 / n2;
+
+			float incoming_angle = dot(normal, -ray.D);
+			float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
+
+			// Compute Freshnel 
+			float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
+
+			float outcoming_angle = dot(-normal, refraction_direction);
+			double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
+			double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
+
+			float Fr = 0.5f * (leftFracture + rightFracture);
+
+			if (k < 0 || RandomFloat() <= Fr)
+			{
+				// Compute reflection
+				float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
+				ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+				//reflectRay.inside = ray.inside;
+				lastAbsorption *= albedo * absorption;
+
+				//return albedo * absorption * Trace(reflectRay, recursion_depth + 1);
+
+			}
+			else
+			{
+				// Compute refraction
+				ray = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
+				ray.inside = !ray.inside;
+				lastAbsorption *= albedo * absorption;
+				//return albedo * absorption * Trace(refractRay, recursion_depth + 1);
+
+			}
+
+			lastSpecular = false;
+
+		}
+	}
+	return E;
+
+}
+*/
+
 void Renderer::KeyDown(int key) {
 	float velocity = .05f;
 	switch (key) {
@@ -264,6 +525,53 @@ void Renderer::KeyUp(int key) {
 
 void Renderer::Tick(float deltaTime)
 {
+	if (!scene.isInitialized)
+		return;
+
+	static bool firstTick = true;
+
+	if (firstTick)
+	{
+
+		extendKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+		scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
+		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+		scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer);
+
+		scene.quadMatrixBuffer->CopyToDevice(false);
+		scene.quadSizeBuffer->CopyToDevice(false);
+		scene.sphereInfoBuffer->CopyToDevice(false);
+		scene.primitiveBuffer->CopyToDevice(false);
+		scene.triangleInfoBuffer->CopyToDevice(false);
+		scene.bvhNodesBuffer->CopyToDevice(false);
+		scene.bvhPrimitiveIdxBuffer->CopyToDevice(false);
+
+		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
+		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer,		  // Primitives
+			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
+			energyBuffer, transmissionBuffer,																					  // E & T
+			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
+			bounceCounterBuffer, bouncePixelIdxBuffer,
+			seedBuffer
+		);
+		seedBuffer->CopyToDevice(false);
+		scene.albedoBuffer->CopyToDevice(false);
+		scene.sphereInvrBuffer->CopyToDevice(false);
+		scene.textureBuffer->CopyToDevice(false);
+		scene.primMaterialBuffer->CopyToDevice(false);
+
+		scene.lightBuffer->CopyToDevice(true);
+
+		connectKernel->SetArguments(shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
+			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
+			energyBuffer, accumulatorBuffer
+		);
+
+		firstTick = false;
+	}
 	// animation
 	static float animTime = 0;
 	scene.SetTime(animTime += deltaTime * 0.002f);
@@ -272,19 +580,64 @@ void Renderer::Tick(float deltaTime)
 
 	if (visualizationMode == PathTracing)
 	{
-		accumulatedFrames += 1;
-		// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
-		#pragma omp parallel for schedule(dynamic)
-		for (int y = 0; y < SCRHEIGHT; y++)
+		if (useGPU)
 		{
-			// trace a primary ray for each pixel on the line
-			for (int x = 0; x < SCRWIDTH; x++)
-				accumulator[x + y * SCRWIDTH] +=
-				float4(Trace(camera->GetPrimaryRay(x, y), 0), 0);
+			accumulatedFrames += 1;
+
+			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
+			generateInitialPrimaryRaysKernel->S(8, float4(camera->camPos, 0));
+			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			// TODO DO SOMETHING SMARTER TO RESET COUNTER
+			rayCounter[0] = SCRWIDTH * SCRHEIGHT; 
+			rayCounterBuffer->CopyToDevice(true);
+
+			extendKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			shadeKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			bounceCounterBuffer->CopyFromDevice(false);
+			shadowCounterBuffer->CopyFromDevice(true);
+
+			connectKernel->Run(shadowCounter[0]);
+
+			while (bounceCounter[0] > 0)
+			{
+				generatePrimaryRaysKernel->Run(bounceCounter[0]);
+
+				rayCounterBuffer->CopyFromDevice(true);
+				
+				extendKernel->Run(rayCounter[0]);
+				
+				shadeKernel->Run(rayCounter[0]);
+				
+				bounceCounterBuffer->CopyFromDevice(false);
+				shadowCounterBuffer->CopyFromDevice(true);
+
+				connectKernel->Run(shadowCounter[0]);
+			}
+
+			finalizeKernel->S(2, (int) accumulatedFrames);
+			finalizeKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			deviceBuffer->CopyFromDevice();
+		}
+		else {
+			accumulatedFrames += 1;
+			// lines are executed as OpenMP parallel tasks (disabled in DEBUG)
+#pragma omp parallel for schedule(dynamic)
+			for (int y = 0; y < SCRHEIGHT; y++)
+			{
+				// trace a primary ray for each pixel on the line
+				for (int x = 0; x < SCRWIDTH; x++)
+					accumulator[x + y * SCRWIDTH] +=
+					float4(Sample(camera->GetPrimaryRay(x, y)), 0);
+				//float4(Trace(camera->GetPrimaryRay(x, y), 0), 0);
 			// translate accumulator contents to rgb32 pixels
-			for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
-				screen->pixels[dest + x] =
-				RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH], accumulatedFrames);
+				for (int dest = y * SCRWIDTH, x = 0; x < SCRWIDTH; x++)
+					screen->pixels[dest + x] =
+					RGBF32_to_RGB8(&accumulator[x + y * SCRWIDTH], accumulatedFrames);
+			}
 		}
 	}
 	else {
@@ -333,6 +686,7 @@ void Renderer::Tick(float deltaTime)
 
 		camera->Update();
 	}
+
 	// performance report - running average - ms, MRays/s
 	static float avg = 10, alpha = 1;
 	avg = (1 - alpha) * avg + alpha * t.elapsed() * 1000;
@@ -340,4 +694,5 @@ void Renderer::Tick(float deltaTime)
 	float fps = 1000 / avg, rps = (SCRWIDTH * SCRHEIGHT) * fps;
 	//std::cout << camera.Direction().x << ", " << camera.Direction().y << ", " << camera.Direction().z << std::endl;
 	printf("%5.2fms (%.1fps) - %.1fMrays/s\n", avg, fps, rps / 1000000);
+
 }

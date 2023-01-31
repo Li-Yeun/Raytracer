@@ -347,3 +347,8 @@ MigrationBackup/
 
 # Ionide (cross platform F# VS Code tools) working folder
 .ionide/
+Raytracer/GPUCache/data_0
+Raytracer/GPUCache/data_1
+Raytracer/GPUCache/data_2
+Raytracer/GPUCache/data_3
+Raytracer/GPUCache/index
