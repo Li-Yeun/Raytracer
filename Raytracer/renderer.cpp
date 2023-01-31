@@ -39,19 +39,16 @@ void Renderer::Init()
 	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 
-	shadowCounter = new int[1]{ 0 };
+	shadowBounceCounter = new int[2]{ 0, 0 };
 
 	// Shadow Ray Buffers
-	shadowCounterBuffer = new Buffer(1 * sizeof(int), shadowCounter, 0);
+	shadowBounceCounterBuffer = new Buffer(2 * sizeof(int), shadowBounceCounter, 0);
 	shadowPixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
 
-	bounceCounter = new int[1]{ 0 };
-
 	// Bounce Ray Buffers
-	bounceCounterBuffer = new Buffer(1 * sizeof(int), bounceCounter, 0);
 	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
 	static uint* seeds = new uint[SCRWIDTH * SCRHEIGHT];
@@ -66,13 +63,11 @@ void Renderer::Init()
 	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
 	energyBuffer, transmissionBuffer);																						
 
-	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, // Primary Rays
-		shadowCounterBuffer,																												// Shadow Rays	
-		bounceCounterBuffer, bouncePixelIdxBuffer);											    // Bounce Rays  
+	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, 
+		shadowBounceCounterBuffer, bouncePixelIdxBuffer);
 
 	rayCounterBuffer->CopyToDevice(false);
-	shadowCounterBuffer->CopyToDevice(false);
-	bounceCounterBuffer->CopyToDevice(false);
+	shadowBounceCounterBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 
@@ -609,8 +604,9 @@ void Renderer::Tick(float deltaTime)
 			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
-			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
-			bounceCounterBuffer, bouncePixelIdxBuffer,
+			shadowBounceCounterBuffer,
+			shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
+			bouncePixelIdxBuffer,
 			accumulatorBuffer,
 			seedBuffer
 		);
@@ -626,7 +622,7 @@ void Renderer::Tick(float deltaTime)
 
 		scene.lightBuffer->CopyToDevice(true);
 
-		connectKernel->SetArguments(shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
+		connectKernel->SetArguments(shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
 			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
 			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
@@ -659,25 +655,21 @@ void Renderer::Tick(float deltaTime)
 
 			shadeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			bounceCounterBuffer->CopyFromDevice(false);
-			shadowCounterBuffer->CopyFromDevice(true);
+			shadowBounceCounterBuffer->CopyFromDevice(true);
 
-			connectKernel->Run(shadowCounter[0]);
+			connectKernel->Run(shadowBounceCounter[0]);
 
-			while (bounceCounter[0] > 0)
+			while (shadowBounceCounter[1] > 0)
 			{
-				generatePrimaryRaysKernel->Run(bounceCounter[0]);
+				generatePrimaryRaysKernel->Run(shadowBounceCounter[1]);
+				
+				extendKernel->Run(shadowBounceCounter[1]);
+				
+				shadeKernel->Run(shadowBounceCounter[1]);
+				
+				shadowBounceCounterBuffer->CopyFromDevice(true);
 
-				rayCounterBuffer->CopyFromDevice(true);
-				
-				extendKernel->Run(rayCounter[0]);
-				
-				shadeKernel->Run(rayCounter[0]);
-				
-				bounceCounterBuffer->CopyFromDevice(false);
-				shadowCounterBuffer->CopyFromDevice(true);
-
-				connectKernel->Run(shadowCounter[0]);
+				connectKernel->Run(shadowBounceCounter[0]);
 			}
 
 			finalizeKernel->S(2, (int) accumulatedFrames);

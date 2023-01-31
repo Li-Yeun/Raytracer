@@ -25,18 +25,13 @@ struct GPUBVHNode
 	int leftFirst, primitiveCount;
 };
 
-__kernel void Connect(__global int* shadowCounter, __global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,
+__kernel void Connect(__global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
 __global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos,
 __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx,
 __global float4* energies, __global float4* accumulator)
 {
     int threadId = get_global_id(0);
-
-    if(threadId >= *shadowCounter) 
-    {
-        return;
-    }
 
     float rayT = shadowDistances[threadId];
     float3 rayO = shadowOrigins[threadId].xyz;

@@ -46,18 +46,14 @@ __kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global 
 __global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture, __global float* refractiveIndices, __global float4* absorptions,       // Primitives
 __global float4* lightCorners, float A, float s, float4 emission,                                                                                                                // Light Source(s)
 __global float4* energies, __global float4* transmissions,                                                                                                                       // E & T
-__global int* shadowCounter, __global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,                  // Shadow Rays
-__global int* bounceCounter, __global int* bouncePixelIdxs,   
+__global int* shadowBounceCounterBuffer, 
+__global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,                  // Shadow Rays
+__global int* bouncePixelIdxs,   
 __global float4* accumulator,                                                                                                                   // Bounce Rays
 __global uint* seeds)  // Maybe make seed a pointer and atomically increment it after creating a seed                                                                                        // Random CPU seed
 {   
     int threadId = get_global_id(0);
-
-    if(threadId >= *rayCounter)
-    {
-        return;
-    }
-
+    
     int rayPixelIdx = pixelIdxs[threadId];
 
     if (primIdxs[rayPixelIdx] == -1)
@@ -98,6 +94,9 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     }
     else
         albedo = albedos[primIdxs[rayPixelIdx]];
+
+    __global int* shadowCounter = &shadowBounceCounterBuffer[0];
+    __global int* bounceCounter = &shadowBounceCounterBuffer[1];
 
     if (materials[primIdxs[rayPixelIdx]] == 1)
     {   
@@ -200,7 +199,6 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 	L /= dist;
 
     if (dot(N, L) > 0 && dot(primNorms[0], -L) > 0) {
-
         int si = atomic_inc(shadowCounter);
 
         shadowOrigins[si] = I + L * 0.001f;

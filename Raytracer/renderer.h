@@ -111,16 +111,14 @@ public:
 	static inline Buffer* energyBuffer;
 	static inline Buffer* transmissionBuffer;
 
-	int* shadowCounter;
+	int* shadowBounceCounter;
 
+	static inline Buffer* shadowBounceCounterBuffer;
 	// Shadow Ray Buffers
-	static inline Buffer* shadowCounterBuffer;
 	static inline Buffer* shadowPixelIdxBuffer;
 	static inline Buffer* shadowOriginBuffer;
 	static inline Buffer* shadowDirectionBuffer;
 	static inline Buffer* shadowDistanceBuffer;
-
-	int* bounceCounter;
 
 	// Bounce Ray Buffers
 	static inline Buffer* bounceCounterBuffer;

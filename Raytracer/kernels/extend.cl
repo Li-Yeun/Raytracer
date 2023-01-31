@@ -34,12 +34,7 @@ __global float16* quadMatrices, __global float* quadSizes, __global float4* sphe
 __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx)
 {
     int threadId = get_global_id(0);
-
-    if(threadId >= *rayCounter) 
-    {
-        return;
-    }
-
+    
     int rayPixelIdx = pixelIdxs[threadId];
 
     float rayT = INFINITY;

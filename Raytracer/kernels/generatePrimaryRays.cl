@@ -39,13 +39,11 @@ float aspect, float4 camPos)                                                    
 }
 
 __kernel void GeneratePrimaryRays(__global int* rayCounter, __global int* pixelIdxs,  // Primary Rays
-__global int* shadowCounter,                                                                                                                                                                    // Shadow Rays  
-__global int* bounceCounter, __global int* bouncePixelIdxs)                                                                                                                                     // Bounce Rays                                                                                                                                                                  // Camera Properties
+__global int* shadowBounceCounterBuffer, __global int* bouncePixelIdxs)                                                                                                                                     // Bounce Rays                                                                                                                                                                  // Camera Properties
 {
     int threadId = get_global_id(0);
     
-    if(threadId >= *bounceCounter) 
-        return;
+    __global int* bounceCounter = &shadowBounceCounterBuffer[1];
 
     pixelIdxs[threadId] = bouncePixelIdxs[threadId];
 
@@ -55,7 +53,9 @@ __global int* bounceCounter, __global int* bouncePixelIdxs)                     
     {
         atomic_xchg(&counter, 0);
         atomic_xchg(rayCounter, *bounceCounter);
-        atomic_xchg(bounceCounter, 0);
+
+        __global int* shadowCounter = &shadowBounceCounterBuffer[0];
         atomic_xchg(shadowCounter, 0);
+        atomic_xchg(bounceCounter, 0);
     }
 }
