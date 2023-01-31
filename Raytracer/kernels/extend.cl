@@ -356,10 +356,9 @@ __global int* shadowBounceCounter, __global int* bouncePixelIdxs)
     int ri = atomic_inc(&counter);
     if(ri == *bounceCounter - 1) 
     {
-        atomic_xchg(&counter, 0);
+        counter = 0;
 
-        __global int* shadowCounter = &shadowBounceCounter[0];
-        atomic_xchg(shadowCounter, 0);
-        atomic_xchg(bounceCounter, 0);
+        shadowBounceCounter[0] = 0;
+        shadowBounceCounter[1] = 0;
     }
 }
