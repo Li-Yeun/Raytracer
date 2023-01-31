@@ -42,12 +42,13 @@ float4 GetAlbedo(float4 I, float4 N, __global uint* texture)
     return (float4)(0.93f, 0.93f, 0.93f, 0.0f);
 }
 
-__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, // Primary Rays
-__global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture,       // Primitives
+__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, __global int* lastSpecular, __global int* insides, // Primary Rays
+__global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture, __global float* refractiveIndices, __global float4* absorptions,       // Primitives
 __global float4* lightCorners, float A, float s, float4 emission,                                                                                                                // Light Source(s)
 __global float4* energies, __global float4* transmissions,                                                                                                                       // E & T
 __global int* shadowCounter, __global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,                  // Shadow Rays
-__global int* bounceCounter, __global int* bouncePixelIdxs,                                                                                                                      // Bounce Rays
+__global int* bounceCounter, __global int* bouncePixelIdxs,   
+__global float4* accumulator,                                                                                                                   // Bounce Rays
 __global uint* seeds)  // Maybe make seed a pointer and atomically increment it after creating a seed                                                                                        // Random CPU seed
 {   
     int threadId = get_global_id(0);
@@ -64,9 +65,19 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 
      // TODO CHECK IF MATERIAL IS LIGHT (PROBABLY DO THIS IN EXTEND KERNEL ALREADY)
     if(materials[primIdxs[rayPixelIdx]] == 4) // IF MAT IS A LIGHT SOURCE
+    {
+        if(lastSpecular[rayPixelIdx] == 1)
+        {
+            accumulator[rayPixelIdx] += energies[rayPixelIdx] + transmissions[rayPixelIdx] * emission;
+        }
+
         return;
+    }
     
+
     seeds[rayPixelIdx] += threadId;
+    lastSpecular[rayPixelIdx] = 0;
+
     
     float4 I = origins[rayPixelIdx] + directions[rayPixelIdx] * distances[rayPixelIdx];
     float4 N;
@@ -79,6 +90,7 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     if (dot( N, directions[rayPixelIdx] ) > 0)
         N = -N; // hit backside / inside
 
+
     float4 albedo;
     if (primIdxs[rayPixelIdx] >= (int)primStartIdx.y && primIdxs[rayPixelIdx] < (int)primStartIdx.y + (int)primCount.y) // If primitive = plane
     {
@@ -87,6 +99,89 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     else
         albedo = albedos[primIdxs[rayPixelIdx]];
 
+    if (materials[primIdxs[rayPixelIdx]] == 1)
+    {   
+        float p = 0.93f;
+
+        if (p < RandomFloat(seeds, rayPixelIdx))
+            return;
+            
+        transmissions[rayPixelIdx] *= 1.0f / p;
+
+        int ei = atomic_inc(bounceCounter);
+        bouncePixelIdxs[ei] = rayPixelIdx;
+
+        float3 R = directions[rayPixelIdx].xyz - 2.0f * (dot(directions[rayPixelIdx].xyz, N.xyz)) * N.xyz;
+        origins[rayPixelIdx] = I + (float4)(R, 0.0f) * 0.001f;
+        directions[rayPixelIdx] = (float4)(R, 0.0f);
+        lastSpecular[rayPixelIdx] = 1;
+        return;
+    }
+    else if (materials[primIdxs[rayPixelIdx]] == 2)
+    {
+        float p = 0.93f;
+
+        if (p < RandomFloat(seeds, rayPixelIdx))
+            return;
+
+        transmissions[rayPixelIdx] *= 1.0f / p;
+
+        // Compute Refraction & Absoption
+        float air_refractive_index = 1.0003f;
+        float n1, n2, refraction_ratio;
+
+        float4 absorption = (float4)(1.0f, 1.0f, 1.0f, 0.0f);
+        if (insides[rayPixelIdx] == 1)
+        {
+            absorption = (float4)(exp(-absorptions[primIdxs[rayPixelIdx]].x * distances[rayPixelIdx]), exp(-absorptions[primIdxs[rayPixelIdx]].y * distances[rayPixelIdx]), exp(-absorptions[primIdxs[rayPixelIdx]].z * distances[rayPixelIdx]), 0.0f);
+            n1 = refractiveIndices[primIdxs[rayPixelIdx]];
+            n2 = air_refractive_index;
+        }
+        else
+        {
+            n1 = air_refractive_index;
+            n2 = refractiveIndices[primIdxs[rayPixelIdx]];
+        }
+
+        refraction_ratio = n1 / n2;
+
+        float incoming_angle = dot(N.xyz, -directions[rayPixelIdx].xyz);
+        float k = 1.0f - (refraction_ratio * refraction_ratio) * (1.0f - (incoming_angle * incoming_angle));
+        // Compute Freshnel 
+        float3 refraction_direction = refraction_ratio * directions[rayPixelIdx].xyz + N.xyz * (refraction_ratio * incoming_angle - sqrt(k));
+
+        float outcoming_angle = dot(-N.xyz, refraction_direction);
+
+        double leftFracture_half = (n1 * incoming_angle - refractiveIndices[primIdxs[rayPixelIdx]] * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle);
+
+        double rightFracture_half = (n1 * outcoming_angle - refractiveIndices[primIdxs[rayPixelIdx]] * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle);
+
+        float Fr = 0.5f * (leftFracture_half * leftFracture_half + rightFracture_half * rightFracture_half);
+
+        lastSpecular[rayPixelIdx] = 1;
+
+        int ei = atomic_inc(bounceCounter);
+        bouncePixelIdxs[ei] = rayPixelIdx;
+
+        transmissions[rayPixelIdx] *= albedo * absorption;
+
+        float3 R = refraction_direction;
+
+        if (k < 0 || RandomFloat(seeds, rayPixelIdx) <= Fr)
+        {
+            // Compute reflection
+            R = directions[rayPixelIdx].xyz - 2.0f * (dot(directions[rayPixelIdx].xyz, N.xyz)) * N.xyz;   
+        }
+        else
+        {
+            // refraction
+            insides[rayPixelIdx] = -insides[rayPixelIdx];
+        }
+        origins[rayPixelIdx] = I + (float4)(R, 0.0f) * 0.001f;
+        directions[rayPixelIdx] = (float4)(R, 0.0f);
+
+        return;
+    }
     float4 BRDF = albedo / M_PI_F;
 
         // Pick random position

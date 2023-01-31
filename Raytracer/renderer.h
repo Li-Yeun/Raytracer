@@ -104,6 +104,9 @@ public:
 	static inline Buffer* distanceBuffer;
 	static inline Buffer* primIdxBuffer;
 
+	static inline Buffer* lastSpecularBuffer;
+	static inline Buffer* insideBuffer;
+
 	// E & T
 	static inline Buffer* energyBuffer;
 	static inline Buffer* transmissionBuffer;

@@ -32,7 +32,8 @@ void Renderer::Init()
 	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
-
+	lastSpecularBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+	insideBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
 	// E & T Buffers
 	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
@@ -62,10 +63,10 @@ void Renderer::Init()
 	seedBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), seeds, 0);
 
 	// Set Kernel Arguments
-	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
 	energyBuffer, transmissionBuffer);																						
 
-	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
+	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, // Primary Rays
 		shadowCounterBuffer,																												// Shadow Rays	
 		bounceCounterBuffer, bouncePixelIdxBuffer);											    // Bounce Rays  
 
@@ -265,54 +266,111 @@ float3 Renderer::Sample(Ray& ray)
 		if (ray.objIdx == -1) break;
 
 		Material material = scene.GetMaterial(ray.objIdx);
+		float3 intersection = ray.O + ray.t * ray.D;
+		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
 
 		if (material.type == Material::MaterialType::LIGHT)
 		{
 			if (lastSpecular)
-				return  material.emission;
-
+				return E + T * material.emission;
 			break;
 		}
-
-		float3 intersection = ray.O + ray.t * ray.D;
-		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
-		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
-		float3 BRDF = albedo / PI;
-
-		// sample a random light source
-		std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
-
-		float A = std::get<0>(result);
-		float3 Nl = std::get<1>(result);
-		float3 light_point = std::get<2>(result);
-		float3 L = light_point - intersection;
-		float dist = magnitude(L);
-		L = normalize(L);
-
-		Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
-
-		if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
+		else if (material.type == Material::MaterialType::MIRROR)
 		{
-			float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
-			float lightPDF = 1.0f / solidAngle;
-			E += T * (dot(normal, L) / lightPDF) * BRDF * std::get<3>(result);
+			float3 reflect_direction = ray.D - 2 * (dot(ray.D, normal)) * normal;
+			ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+			lastSpecular = true;
 		}
+		else if (material.type == Material::MaterialType::GLASS)
+		{
+			float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+			// Compute Refraction & Absoption
+			float air_refractive_index = 1.0003f;
+			float n1, n2, refraction_ratio;
 
-		// Russian Roulette
-		float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
+			float3 absorption = float3(1.0f);
+			if (ray.inside)
+			{
+				absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z * ray.t));
+				n1 = material.refractive_index;
+				n2 = air_refractive_index;
+			}
+			else
+			{
+				n1 = air_refractive_index;
+				n2 = material.refractive_index;
+			}
 
-		if (p < RandomFloat()) 
-			break; 
+			refraction_ratio = n1 / n2;
 
-		T *= 1.0f / p;
+			float incoming_angle = dot(normal, -ray.D);
+			float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
 
-		// continue random walk
-		float3 R = scene.DiffuseReflection(normal);
-		float hemiPDF = 1.0f / (PI * 2.0f);
-		ray = Ray(intersection + R * 0.001f, R);
-		T *= (dot(normal, R) / hemiPDF) * BRDF;
+			// Compute Freshnel 
+			float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
 
-		lastSpecular = false;
+			float outcoming_angle = dot(-normal, refraction_direction);
+			double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
+			double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
+
+			float Fr = 0.5f * (leftFracture + rightFracture);
+			lastSpecular = true;
+			T *= albedo * absorption;
+			if (k < 0 || RandomFloat() <= Fr)
+			{
+				// Compute reflection
+				float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
+				ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+
+			}
+			else
+			{
+				// Compute refraction
+				ray = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
+				ray.inside = !ray.inside;
+
+			}
+		}
+		else
+		{
+			float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+			float3 BRDF = albedo / PI;
+
+			// sample a random light source
+			std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
+
+			float A = std::get<0>(result);
+			float3 Nl = std::get<1>(result);
+			float3 light_point = std::get<2>(result);
+			float3 L = light_point - intersection;
+			float dist = magnitude(L);
+			L = normalize(L);
+
+			Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
+
+			if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
+			{
+				float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
+				float lightPDF = 1.0f / solidAngle;
+				E += T * (dot(normal, L) / lightPDF) * BRDF * std::get<3>(result);
+			}
+
+			// Russian Roulette
+			float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
+
+			if (p < RandomFloat())
+				break;
+
+			T *= 1.0f / p;
+
+			// continue random walk
+			float3 R = scene.DiffuseReflection(normal);
+			float hemiPDF = 1.0f / (PI * 2.0f);
+			ray = Ray(intersection + R * 0.001f, R);
+			T *= (dot(normal, R) / hemiPDF) * BRDF;
+
+			lastSpecular = false;
+		}
 	}
 	return E;
 
@@ -547,19 +605,24 @@ void Renderer::Tick(float deltaTime)
 		scene.bvhPrimitiveIdxBuffer->CopyToDevice(false);
 
 		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
-		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays
-			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer,		  // Primitives
+		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
+			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
 			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
 			bounceCounterBuffer, bouncePixelIdxBuffer,
+			accumulatorBuffer,
 			seedBuffer
 		);
+
 		seedBuffer->CopyToDevice(false);
 		scene.albedoBuffer->CopyToDevice(false);
 		scene.sphereInvrBuffer->CopyToDevice(false);
 		scene.textureBuffer->CopyToDevice(false);
 		scene.primMaterialBuffer->CopyToDevice(false);
+
+		scene.refractiveIndexBuffer->CopyToDevice(false);
+		scene.absorptionBuffer->CopyToDevice(false);
 
 		scene.lightBuffer->CopyToDevice(true);
 
@@ -584,8 +647,8 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
-			generateInitialPrimaryRaysKernel->S(7, camera->aspect);
-			generateInitialPrimaryRaysKernel->S(8, float4(camera->camPos, 0));
+			generateInitialPrimaryRaysKernel->S(9, camera->aspect);
+			generateInitialPrimaryRaysKernel->S(10, float4(camera->camPos, 0));
 			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			// TODO DO SOMETHING SMARTER TO RESET COUNTER
