@@ -1,14 +1,15 @@
-uint RandomUInt(__global uint* seeds, int id)
+uint RandomUInt(uint seed)
 {
-	seeds[id] ^= seeds[id] << 13;
-	seeds[id] ^= seeds[id] >> 17;
-	seeds[id] ^= seeds[id] << 5;
-	return seeds[id];
+    uint localSeed = seed;
+	localSeed ^= localSeed << 13;
+	localSeed ^= localSeed >> 17;
+	localSeed ^= localSeed << 5;
+	return localSeed;
 }
 
-//float RandomFloatSeed(uint seed) { return RandomUIntSeed(seed) * 2.3283064365387e-10f; }
-float RandomFloat(__global uint* seeds, int id) { return RandomUInt(seeds, id) * 2.3283064365387e-10f; }
-float Rand(__global uint* seeds, int id, float range) { return RandomFloat(seeds, id) * range; }
+
+float RandomFloat(uint seed) { return seed * 2.3283064365387e-10f; }
+float Rand(uint seed, float range) { return RandomFloat(seed) * range; }
 
 float magnitude(float4 v)
 {
@@ -70,8 +71,8 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
         return;
     }
     
+    uint localSeed = seeds[rayPixelIdx] + threadId;
 
-    seeds[rayPixelIdx] += threadId;
     lastSpecular[rayPixelIdx] = 0;
 
     
@@ -101,8 +102,10 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     if (materials[primIdxs[rayPixelIdx]] == 1)
     {   
         float p = 0.93f;
+        localSeed = RandomUInt(localSeed);
+        seeds[rayPixelIdx] = localSeed;
 
-        if (p < RandomFloat(seeds, rayPixelIdx))
+        if (p < RandomFloat(localSeed))
             return;
             
         transmissions[rayPixelIdx] *= 1.0f / p;
@@ -119,8 +122,10 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     else if (materials[primIdxs[rayPixelIdx]] == 2)
     {
         float p = 0.93f;
+        localSeed = RandomUInt(localSeed);
+        seeds[rayPixelIdx] = localSeed;
 
-        if (p < RandomFloat(seeds, rayPixelIdx))
+        if (p < RandomFloat(localSeed))
             return;
 
         transmissions[rayPixelIdx] *= 1.0f / p;
@@ -166,7 +171,10 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 
         float3 R = refraction_direction;
 
-        if (k < 0 || RandomFloat(seeds, rayPixelIdx) <= Fr)
+        localSeed = RandomUInt(localSeed);
+        seeds[rayPixelIdx] = localSeed;
+
+        if (k < 0 || RandomFloat(localSeed) <= Fr)
         {
             // Compute reflection
             R = directions[rayPixelIdx].xyz - 2.0f * (dot(directions[rayPixelIdx].xyz, N.xyz)) * N.xyz;   
@@ -185,11 +193,14 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 
         // Pick random position
     float4 c1c2 = normalize(lightCorners[0] - lightCorners[1]);
-    float randomLength = RandomFloat(seeds, rayPixelIdx) * s;
+    localSeed = RandomUInt(localSeed);
+
+    float randomLength = RandomFloat(localSeed) * s;
     float4 u = c1c2 * randomLength;
 
     float4 c2c3 = normalize(lightCorners[2] - lightCorners[1]);
-    randomLength = RandomFloat(seeds, rayPixelIdx) * s;
+    localSeed = RandomUInt(localSeed);
+    randomLength = RandomFloat(localSeed) * s;
     float4 v = c2c3 * randomLength;
 
     float4 light_point = lightCorners[1] + u + v - (float4)(0.0f, 0.01f, 0.0f, 0.0f);
@@ -217,20 +228,34 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     // Russian Roulette
     
     float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
-    //printf("float: %f", p);
-    if (p >= RandomFloat(seeds, rayPixelIdx)) {
+    localSeed = RandomUInt(localSeed);
+    
+    if (p >= RandomFloat(localSeed)) {
         // continue random walk
         int ei = atomic_inc(bounceCounter);
         bouncePixelIdxs[ei] = rayPixelIdx;
 
         transmissions[rayPixelIdx] *= 1.0f / p;
-
+            
+        localSeed = RandomUInt(localSeed);
+        float x = Rand(localSeed, 2.0f);
+        localSeed = RandomUInt(localSeed);
+        float y = Rand(localSeed, 2.0f);
+        localSeed = RandomUInt(localSeed);
+        float z = Rand(localSeed, 2.0f);
         // Calculate a diffuse reflection
-        float4 R = (float4) (Rand(seeds, rayPixelIdx, 2.0f) - 1.0f, Rand(seeds, rayPixelIdx, 2.0f) - 1.0f, Rand(seeds, rayPixelIdx, 2.0f) - 1.0f, 0);
+        float4 R = (float4) (x - 1.0f, y - 1.0f, z - 1.0f, 0);
 
         while (magnitude(R) > 1.0f)
         {
-            R = (float4)(Rand(seeds, rayPixelIdx, 2.0f) - 1.0f, Rand(seeds, rayPixelIdx, 2.0f) - 1.0f, Rand(seeds, rayPixelIdx, 2.0f) - 1.0f, 0);
+            localSeed = RandomUInt(localSeed);
+            float x = Rand(localSeed, 2.0f);
+            localSeed = RandomUInt(localSeed);
+            float y = Rand(localSeed, 2.0f);
+            localSeed = RandomUInt(localSeed);
+            float z = Rand(localSeed, 2.0f);
+
+            R = (float4)(x - 1.0f, y - 1.0f, z - 1.0f, 0);
         }
 
         R = normalize(R);
@@ -244,5 +269,7 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 
         transmissions[rayPixelIdx] *= (dot(N, R) / hemiPDF) * BRDF;
     }
+    
+    seeds[rayPixelIdx] = localSeed;
 
 }
