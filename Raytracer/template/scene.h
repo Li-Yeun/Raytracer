@@ -39,13 +39,13 @@ class Scene
 public:
     Scene()
     {
-        def_mat = Material(Material::MaterialType::DIFFUSE, float3(1), 0);
+        def_mat = Material(Material::MaterialType::DIFFUSE, float3(0.93f), 0);
         red_mat = Material(Material::MaterialType::DIFFUSE, float3(0.93f, 0.21f, 0.21f), 0);
         cyan_mat = Material(Material::MaterialType::DIFFUSE, float3(0.11f, 0.95f, 0.91f), 0);
-        mirror_mat = Material(Material::MaterialType::MIRROR, float3(1), 0);
+        mirror_mat = Material(Material::MaterialType::MIRROR, float3(0.93f), 0);
         absorb_all_but_blue_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(8.0f, 2.0f, 1.0f));
-        glass_mat = Material(Material::MaterialType::GLASS, float3(1), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
-        light_mat = Material(Material::MaterialType::LIGHT, float3(1), NULL, NULL, float3(NULL), float3(2.0f));
+        glass_mat = Material(Material::MaterialType::GLASS, float3(0.93f), 0, 1.52, float3(0));//float3(8.0f, 2.0f, 0.1f));
+        light_mat = Material(Material::MaterialType::LIGHT, float3(0.93f), NULL, NULL, float3(NULL), float3(2.0f));
 
 
         mat4 M1base = mat4::Translate(float3(0, 2.6f, 2));
@@ -59,7 +59,7 @@ public:
 
         spheres_size = 2;
         spheres = new Sphere[spheres_size]{ 
-            Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, cyan_mat),                             // 1: bouncing ball
+            Sphere(id++, float3(-1.4f, -0.5f, 2), 0.5f, absorb_all_but_blue_mat),                             // 1: bouncing ball
             Sphere(id++,float3(0, 2.5f, -3.07f), 0.5f, def_mat) };						        // 2: rounded corners		
 
         cubes_size = 1;
@@ -91,7 +91,11 @@ public:
         int totalPrimitives = quads_size + spheres_size + cubes_size + planes_size + triangles_size;
         
         //  Intersections
+        albedos = new float4[totalPrimitives];
         primMaterials = new int[totalPrimitives];
+        refractiveIndices = new float[totalPrimitives];
+        absorptions = new float4[totalPrimitives];
+
         quadMatrices = new mat4[quads_size];
         quadSizes = new float[quads_size];
         sphereInfos = new float4[spheres_size];
@@ -99,7 +103,6 @@ public:
         // Normals
         primitives = new float4[totalPrimitives];
         sphereInvrs = new float[spheres_size];
-        albedos = new float4[totalPrimitives];
 
         for (int i = 0; i < totalPrimitives; i++)
         {
@@ -113,6 +116,9 @@ public:
 
                 primitives[i] = float4(quads[i].N, 0);
                 albedos[i] = float4(quads[i].material.color, 0);
+
+                refractiveIndices[i] = quads[i].material.refractive_index;
+                absorptions[i] = float4(quads[i].material.absorption, 0);
             }
 
             lowerLimit = upperLimit;
@@ -125,6 +131,9 @@ public:
                 primitives[i] = float4(spheres[i - lowerLimit].pos, 0);
                 sphereInvrs[i - lowerLimit] = spheres[i - lowerLimit].invr;
                 albedos[i] = float4(spheres[i - lowerLimit].material.color, 0);
+
+                refractiveIndices[i] = spheres[i - lowerLimit].material.refractive_index;
+                absorptions[i] = float4(spheres[i - lowerLimit].material.absorption, 0);
             }
 
             lowerLimit = upperLimit;
@@ -137,6 +146,10 @@ public:
                 // TODO CHANGE AND DELETE LATER
                 primitives[i] = float4(0);
                 albedos[i] = float4(0);
+
+
+                refractiveIndices[i] = 0;
+                absorptions[i] = float4(0);
             }
 
             lowerLimit = upperLimit;
@@ -148,6 +161,9 @@ public:
 
                 primitives[i] = float4(planes[i - lowerLimit].N, planes[i - lowerLimit].d);
                 albedos[i] = float4(planes[i - lowerLimit].material.color, 0);
+
+                refractiveIndices[i] = planes[i - lowerLimit].material.refractive_index;
+                absorptions[i] = float4(planes[i - lowerLimit].material.absorption, 0);
             }
 
             if (i >= upperLimit)
@@ -159,6 +175,9 @@ public:
 
                 primitives[i] = float4(triangles[i - upperLimit].N, 0);
                 albedos[i] = float4(triangles[i - upperLimit].material.color, 0);
+
+                refractiveIndices[i] = triangles[i - upperLimit].material.refractive_index;
+                absorptions[i] = float4(triangles[i - upperLimit].material.absorption, 0);
             }
 
         }
@@ -173,6 +192,9 @@ public:
         primitiveBuffer = new Buffer(totalPrimitives * sizeof(float4), primitives , CL_MEM_READ_ONLY);
         sphereInvrBuffer = new Buffer(spheres_size * sizeof(float), sphereInvrs, CL_MEM_READ_ONLY);
         albedoBuffer = new Buffer(totalPrimitives * sizeof(float4), albedos, CL_MEM_READ_ONLY);
+
+        refractiveIndexBuffer = new Buffer(totalPrimitives * sizeof(float), refractiveIndices, CL_MEM_READ_ONLY);
+        absorptionBuffer = new Buffer(totalPrimitives * sizeof(float4), absorptions, CL_MEM_READ_ONLY);
 
         float4* lights = new float4[3]{ float4(quads[0].c1,0), float4(quads[0].c2, 0), float4(quads[0].c3, 0) };
         lightBuffer = new Buffer(1 * 3 * sizeof(float4), lights, CL_MEM_READ_ONLY);
@@ -554,20 +576,26 @@ public:
     bool useQBVH = true;
 
     // Primitive Buffers
+    int* primMaterials;
+    float4* albedos;
+    float* refractiveIndices;
+    float4* absorptions;
 
+    static inline Buffer* primMaterialBuffer;
     static inline Buffer* albedoBuffer;
+    static inline Buffer* refractiveIndexBuffer;
+    static inline Buffer* absorptionBuffer;
+
     static inline Buffer* textureBuffer;
     static inline Buffer* lightBuffer;
 
     // Intersection
-    int* primMaterials;
     mat4* quadMatrices;
     float* quadSizes;
     float4* sphereInfos;
     // TODO CUBES
     float4* triangleInfos;
   
-    static inline Buffer* primMaterialBuffer;
     static inline Buffer* quadMatrixBuffer;
     static inline Buffer* quadSizeBuffer;
     static inline Buffer* sphereInfoBuffer;
@@ -575,7 +603,6 @@ public:
     // Normals
     float4* primitives;
     float* sphereInvrs;
-    float4* albedos;
 
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;

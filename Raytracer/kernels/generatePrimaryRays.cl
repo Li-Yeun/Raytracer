@@ -3,7 +3,7 @@
 
 __global int counter = 0;
 
-__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, __global int* lastSpecular, // Primary Rays
+__kernel void GenerateInitialPrimaryRays(__global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, __global int* lastSpecular, __global int* insides,// Primary Rays
 __global float4* energies, __global float4* transmissions,                                                                                                                  // E & T
 float aspect, float4 camPos)                                                                                                                                                 // Camera Properties
 {
@@ -29,6 +29,7 @@ float aspect, float4 camPos)                                                    
     primIdxs[threadId] = -1;        // ONNODIG DOET EXTEND KERNEL AL
 
     lastSpecular[threadId] = 1;
+    insides[threadId] = -1;
 
     // Reset Buffers to initial values
     pixelIdxs[threadId] = threadId;

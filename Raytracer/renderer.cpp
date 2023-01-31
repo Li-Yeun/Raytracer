@@ -33,6 +33,7 @@ void Renderer::Init()
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 	lastSpecularBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
+	insideBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
 	// E & T Buffers
 	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
@@ -62,7 +63,7 @@ void Renderer::Init()
 	seedBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), seeds, 0);
 
 	// Set Kernel Arguments
-	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer,// Primary Rays
+	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
 	energyBuffer, transmissionBuffer);																						
 
 	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, // Primary Rays
@@ -280,9 +281,58 @@ float3 Renderer::Sample(Ray& ray)
 			ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
 			lastSpecular = true;
 		}
+		else if (material.type == Material::MaterialType::GLASS)
+		{
+			float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
+			// Compute Refraction & Absoption
+			float air_refractive_index = 1.0003f;
+			float n1, n2, refraction_ratio;
+
+			float3 absorption = float3(1.0f);
+			if (ray.inside)
+			{
+				absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z * ray.t));
+				n1 = material.refractive_index;
+				n2 = air_refractive_index;
+			}
+			else
+			{
+				n1 = air_refractive_index;
+				n2 = material.refractive_index;
+			}
+
+			refraction_ratio = n1 / n2;
+
+			float incoming_angle = dot(normal, -ray.D);
+			float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
+
+			// Compute Freshnel 
+			float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
+
+			float outcoming_angle = dot(-normal, refraction_direction);
+			double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
+			double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
+
+			float Fr = 0.5f * (leftFracture + rightFracture);
+			lastSpecular = true;
+			T *= albedo * absorption;
+			if (k < 0 || RandomFloat() <= Fr)
+			{
+				// Compute reflection
+				float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
+				ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
+
+			}
+			else
+			{
+				// Compute refraction
+				ray = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
+				ray.inside = !ray.inside;
+
+			}
+		}
 		else
 		{
-
 			float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
 			float3 BRDF = albedo / PI;
 
@@ -555,8 +605,8 @@ void Renderer::Tick(float deltaTime)
 		scene.bvhPrimitiveIdxBuffer->CopyToDevice(false);
 
 		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
-		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, // Primary Rays
-			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer,		  // Primitives
+		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
+			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
 			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
@@ -564,11 +614,15 @@ void Renderer::Tick(float deltaTime)
 			accumulatorBuffer,
 			seedBuffer
 		);
+
 		seedBuffer->CopyToDevice(false);
 		scene.albedoBuffer->CopyToDevice(false);
 		scene.sphereInvrBuffer->CopyToDevice(false);
 		scene.textureBuffer->CopyToDevice(false);
 		scene.primMaterialBuffer->CopyToDevice(false);
+
+		scene.refractiveIndexBuffer->CopyToDevice(false);
+		scene.absorptionBuffer->CopyToDevice(false);
 
 		scene.lightBuffer->CopyToDevice(true);
 
@@ -593,8 +647,8 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
-			generateInitialPrimaryRaysKernel->S(8, camera->aspect);
-			generateInitialPrimaryRaysKernel->S(9, float4(camera->camPos, 0));
+			generateInitialPrimaryRaysKernel->S(9, camera->aspect);
+			generateInitialPrimaryRaysKernel->S(10, float4(camera->camPos, 0));
 			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			// TODO DO SOMETHING SMARTER TO RESET COUNTER
