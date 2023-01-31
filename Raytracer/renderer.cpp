@@ -33,6 +33,7 @@ void Renderer::Init()
 	distanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
 	primIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
+
 	// E & T Buffers
 	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
@@ -531,15 +532,19 @@ void Renderer::Tick(float deltaTime)
 
 	if (firstTick)
 	{
+
 		extendKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
 		scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
-		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer);
+		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+		scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer);
 
 		scene.quadMatrixBuffer->CopyToDevice(false);
 		scene.quadSizeBuffer->CopyToDevice(false);
 		scene.sphereInfoBuffer->CopyToDevice(false);
 		scene.primitiveBuffer->CopyToDevice(false);
 		scene.triangleInfoBuffer->CopyToDevice(false);
+		scene.bvhNodesBuffer->CopyToDevice(false);
+		scene.bvhPrimitiveIdxBuffer->CopyToDevice(false);
 
 		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
 		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, // Primary Rays

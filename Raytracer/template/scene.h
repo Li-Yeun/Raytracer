@@ -181,6 +181,10 @@ public:
         static Surface logo("assets/logo.png");
         textureBuffer = new Buffer(logo.width * logo.height * sizeof(uint), logo.pixels, CL_MEM_READ_ONLY); // Todo set this as texture memory
 
+        //BVH Buffers
+        bvhNodesBuffer = new Buffer(((spheres_size + triangles_size) * 2 + 1) * sizeof(GPUBVHNode), bvh->gpuBvhNode);
+        bvhPrimitiveIdxBuffer = new Buffer((spheres_size + triangles_size) * sizeof(int), bvh->primitiveIdx);
+
         isInitialized = true;
     }
         
@@ -575,6 +579,10 @@ public:
 
     static inline Buffer* primitiveBuffer;
     static inline Buffer* sphereInvrBuffer;
+
+    //BVH Buffers
+    static inline Buffer* bvhNodesBuffer;
+    static inline Buffer* bvhPrimitiveIdxBuffer;
 
 
 

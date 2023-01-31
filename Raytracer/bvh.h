@@ -8,6 +8,13 @@ __declspec(align(32)) struct BVHNode
 	bool isLeaf() { return primitiveCount > 0; }
 };
 
+struct GPUBVHNode
+{
+	float aabbMinx, aabbMiny, aabbMinz;
+	float aabbMaxx, aabbMaxy, aabbMaxz;
+	int leftFirst, primitiveCount;
+};
+
 __declspec(align(64)) struct SIMD_BVH_Node
 {
 	union { __m128 bminx4; float bminx[4]; };
@@ -45,6 +52,7 @@ public:
     int* primitiveIdx = 0;
 	
     BVHNode* bvhNode = 0;
+	GPUBVHNode* gpuBvhNode = 0;
     uint rootNodeIdx = 0, planeRootNodeIdx = 1, primitveRootNodeIdx = 2, nodesUsed = 3;
 
 	// QBVH
@@ -242,7 +250,10 @@ public:
 
 	void BuildBVH()
 	{
-		bvhNode = new BVHNode[(spheres_size + triangles_size) * 2 + 1]; // 1 leaf node reserved for planes
+		int nBvhNodes = (spheres_size + triangles_size) * 2 + 1;
+		bvhNode = new BVHNode[nBvhNodes]; // 1 leaf node reserved for planes
+		gpuBvhNode = new GPUBVHNode[nBvhNodes];
+
 		primitiveIdx = new int[spheres_size + triangles_size];
 		// populate triangle index array
 		for (int i = 0; i < spheres_size + triangles_size; i++) primitiveIdx[i] = i;
@@ -261,6 +272,19 @@ public:
 
 		UpdateNodeBounds(primitveRootNodeIdx);
 		Subdivide(primitveRootNodeIdx);
+
+		// Prepare GPU buffer
+		for (int i = 0; i < nBvhNodes; i++)
+		{
+			gpuBvhNode[i].aabbMinx = bvhNode[i].aabbMin.x;
+			gpuBvhNode[i].aabbMiny = bvhNode[i].aabbMin.y;
+			gpuBvhNode[i].aabbMinz = bvhNode[i].aabbMin.z;
+			gpuBvhNode[i].leftFirst = bvhNode[i].leftFirst;
+			gpuBvhNode[i].aabbMaxx= bvhNode[i].aabbMax.x;
+			gpuBvhNode[i].aabbMaxy = bvhNode[i].aabbMax.y;
+			gpuBvhNode[i].aabbMaxz = bvhNode[i].aabbMax.z;
+			gpuBvhNode[i].primitiveCount = bvhNode[i].primitiveCount;
+		}
 	}
 
 	void UpdateNodeBounds(uint nodeIdx)
