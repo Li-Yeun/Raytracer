@@ -566,6 +566,7 @@ void Renderer::Tick(float deltaTime)
 		connectKernel->SetArguments(shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
 			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
 			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
 			energyBuffer, accumulatorBuffer
 		);
 

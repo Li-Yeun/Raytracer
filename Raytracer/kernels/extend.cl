@@ -1,12 +1,5 @@
 // int primMats;    // DIFFUSE = 0, MIRROR = 1, GLASS = 2, SUBSTANCE = 1, LIGHT = 0 
 
-/*
-float rayT;
-int rayObjIdx;
-float3 rayO;
-float3 rayD;
-*/
-
 // Multiply a 4x4 matrix by a 4x1 vector and convert it to a 3x1 vector
 float3 MultiplyMatrix(float4 b, float16 a)
 {
@@ -14,7 +7,6 @@ float3 MultiplyMatrix(float4 b, float16 a)
         a.s4 * b.x + a.s5 * b.y + a.s6 * b.z + a.s7 * b.w,
 		a.s8 * b.x + a.s9 * b.y + a.sA * b.z + a.sB * b.w);
 }
-
 
 float IntersectAABBStack(float3 rayOrigin, float3 rayDirection, float rayDistance, float3 bmin, float3 bmax)
 {

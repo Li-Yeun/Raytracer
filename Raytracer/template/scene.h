@@ -77,9 +77,9 @@ public:
 
         std::cout << "Loading objects ..." << std::endl;
 
-        LoadObject("assets/pyramid.obj", glass_mat, float3(0, 0, 1.5));
-        //LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
-        //LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj", glass_mat, float3(0, 0, 1.5));
+        LoadObject("assets/monkey.obj",  cyan_mat, float3(1.5, 0, 1.5));
+        LoadObject("assets/monkey.obj",  red_mat, float3(-1.5, 0, 1.5));
 
         bvh = new BVH(spheres, spheres_size, planes, planes_size, triangles, triangles_size);
         SetTime( 0 );
