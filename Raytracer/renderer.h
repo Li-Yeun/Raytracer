@@ -103,6 +103,7 @@ public:
 	static inline Buffer* directionBuffer;
 	static inline Buffer* distanceBuffer;
 	static inline Buffer* primIdxBuffer;
+	static inline Buffer* lastSpecularBuffer;
 
 	// E & T
 	static inline Buffer* energyBuffer;

@@ -42,12 +42,13 @@ float4 GetAlbedo(float4 I, float4 N, __global uint* texture)
     return (float4)(0.93f, 0.93f, 0.93f, 0.0f);
 }
 
-__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, // Primary Rays
+__kernel void Shade(__global int* rayCounter, __global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, __global int* lastSpecular, // Primary Rays
 __global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture,       // Primitives
 __global float4* lightCorners, float A, float s, float4 emission,                                                                                                                // Light Source(s)
 __global float4* energies, __global float4* transmissions,                                                                                                                       // E & T
 __global int* shadowCounter, __global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,                  // Shadow Rays
-__global int* bounceCounter, __global int* bouncePixelIdxs,                                                                                                                      // Bounce Rays
+__global int* bounceCounter, __global int* bouncePixelIdxs,   
+__global float4* accumulator,                                                                                                                   // Bounce Rays
 __global uint* seeds)  // Maybe make seed a pointer and atomically increment it after creating a seed                                                                                        // Random CPU seed
 {   
     int threadId = get_global_id(0);
@@ -64,8 +65,16 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 
      // TODO CHECK IF MATERIAL IS LIGHT (PROBABLY DO THIS IN EXTEND KERNEL ALREADY)
     if(materials[primIdxs[rayPixelIdx]] == 4) // IF MAT IS A LIGHT SOURCE
+    {
+        if(lastSpecular[rayPixelIdx] == 1)
+            accumulator[rayPixelIdx] += transmissions[rayPixelIdx] * emission;
+
         return;
+    }
     
+
+    lastSpecular[rayPixelIdx] = 0;
+
     seeds[rayPixelIdx] += threadId;
     
     float4 I = origins[rayPixelIdx] + directions[rayPixelIdx] * distances[rayPixelIdx];
@@ -79,6 +88,7 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     if (dot( N, directions[rayPixelIdx] ) > 0)
         N = -N; // hit backside / inside
 
+
     float4 albedo;
     if (primIdxs[rayPixelIdx] >= (int)primStartIdx.y && primIdxs[rayPixelIdx] < (int)primStartIdx.y + (int)primCount.y) // If primitive = plane
     {
@@ -87,6 +97,20 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
     else
         albedo = albedos[primIdxs[rayPixelIdx]];
 
+    if (materials[primIdxs[rayPixelIdx]] == 1)
+    {   
+        // Add recursion depth
+
+        int ei = atomic_inc(bounceCounter);
+        bouncePixelIdxs[ei] = rayPixelIdx;
+
+        float3 R = directions[rayPixelIdx].xyz - 2 * (dot(directions[rayPixelIdx].xyz, N.xyz)) * N.xyz;
+        origins[rayPixelIdx] = I + (float4)(R,0) * 0.001f;
+        directions[rayPixelIdx] = (float4)(R,0);
+        lastSpecular[rayPixelIdx] = 1;
+        return;
+    }
+    
     float4 BRDF = albedo / M_PI_F;
 
         // Pick random position
