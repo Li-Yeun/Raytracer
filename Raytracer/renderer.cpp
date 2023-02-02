@@ -578,12 +578,14 @@ void Renderer::Tick(float deltaTime)
 
 		initialExtendKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
 		scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
-		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 		scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer);
 
 		scene.quadMatrixBuffer->CopyToDevice(false);
 		scene.quadSizeBuffer->CopyToDevice(false);
 		scene.sphereInfoBuffer->CopyToDevice(false);
+		scene.cubeInvMatrixBuffer->CopyToDevice(false);
+		scene.cubeBBuffer->CopyToDevice(false);
 		scene.primitiveBuffer->CopyToDevice(false);
 		scene.triangleInfoBuffer->CopyToDevice(false);
 		scene.bvhNodesBuffer->CopyToDevice(false);
@@ -591,15 +593,16 @@ void Renderer::Tick(float deltaTime)
 
 		extendKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
 			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
-			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
 			shadowBounceCounterBuffer, bouncePixelIdxBuffer);
 
 		shadowBounceCounterBuffer->CopyToDevice(false);
 
-		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
+		int cubeStartIdx = scene.quads_size + scene.spheres_size;
+		int planeStartIdx = cubeStartIdx + scene.cubes_size;
 		shadeKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
-			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
+			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.cubeMatrixBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, float4(scene.quads_size, planeStartIdx, cubeStartIdx, 0), float4(scene.spheres_size, scene.planes_size, scene.cubes_size, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
 			shadowBounceCounterBuffer,
@@ -615,6 +618,8 @@ void Renderer::Tick(float deltaTime)
 		scene.textureBuffer->CopyToDevice(false);
 		scene.primMaterialBuffer->CopyToDevice(false);
 
+		scene.cubeMatrixBuffer->CopyToDevice(false);
+
 		scene.refractiveIndexBuffer->CopyToDevice(false);
 		scene.absorptionBuffer->CopyToDevice(false);
 
@@ -622,7 +627,7 @@ void Renderer::Tick(float deltaTime)
 
 		connectKernel->SetArguments(shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
 			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
-			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
 			energyBuffer, accumulatorBuffer
 		);

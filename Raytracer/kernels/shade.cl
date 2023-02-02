@@ -1,3 +1,10 @@
+float3 MultiplyMatrix(float4 b, float16 a)
+{
+    return (float3)(a.s0 * b.x + a.s1 * b.y + a.s2 * b.z + a.s3 * b.w,
+        a.s4 * b.x + a.s5 * b.y + a.s6 * b.z + a.s7 * b.w,
+		a.s8 * b.x + a.s9 * b.y + a.sA * b.z + a.sB * b.w);
+}
+
 uint RandomUInt(uint seed)
 {
     uint localSeed = seed;
@@ -44,7 +51,7 @@ float4 GetAlbedo(float4 I, float4 N, __global uint* texture)
 }
 
 __kernel void Shade(__global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs, __global int* lastSpecular, __global int* insides, // Primary Rays
-__global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs, float4 primStartIdx, float4 primCount, __global uint* texture, __global float* refractiveIndices, __global float4* absorptions,       // Primitives
+__global float4* albedos, __global int* materials, __global float4* primNorms, __global float* sphereInvrs,  __global float16* cubeMatrices,  __global float16* cubeInvMatrices, __global float4* cubeB, float4 primStartIdx, float4 primCount, __global uint* texture, __global float* refractiveIndices, __global float4* absorptions,       // Primitives
 __global float4* lightCorners, float A, float s, float4 emission,                                                                                                                // Light Source(s)
 __global float4* energies, __global float4* transmissions,                                                                                                                       // E & T
 __global int* shadowBounceCounterBuffer, 
@@ -81,7 +88,28 @@ __global uint* seeds)  // Maybe make seed a pointer and atomically increment it 
 
     if(primIdxs[rayPixelIdx] >= (int)primStartIdx.x && primIdxs[rayPixelIdx] < (int)primStartIdx.x + (int)primCount.x) // If primitive = sphere
         N = (I - primNorms[primIdxs[rayPixelIdx]]) * sphereInvrs[primIdxs[rayPixelIdx] - (int)primStartIdx.x];
-    else
+    else if (primIdxs[rayPixelIdx] >= (int)primStartIdx.z && primIdxs[rayPixelIdx] < (int)primStartIdx.z + (int)primCount.z) // If primitive = cube
+    {
+        int cubeIdx = primIdxs[rayPixelIdx] - (int)primStartIdx.z;
+        int cubeIdxFirst = cubeIdx * 2;
+        int cubeIdxSecond = cubeIdxFirst + 1;
+
+        float3 objI = MultiplyMatrix((float4)(I.xyz, 1), cubeInvMatrices[cubeIdx]);
+        // determine normal in object space
+        float3 Ncube = (float3)(-1, 0, 0);
+        float d0 = fabs(objI.x - cubeB[cubeIdxFirst].x), d1 = fabs(objI.x - cubeB[cubeIdxSecond].x);
+        float d2 = fabs(objI.y - cubeB[cubeIdxFirst].y), d3 = fabs(objI.y - cubeB[cubeIdxSecond].y);
+        float d4 = fabs(objI.z - cubeB[cubeIdxFirst].z), d5 = fabs(objI.z - cubeB[cubeIdxSecond].z);
+        float minDist = d0;
+        if (d1 < minDist) minDist = d1, Ncube.x = 1;
+        if (d2 < minDist) minDist = d2, Ncube = (float3)(0, -1, 0);
+        if (d3 < minDist) minDist = d3, Ncube = (float3)(0, 1, 0);
+        if (d4 < minDist) minDist = d4, Ncube = (float3)(0, 0, -1);
+        if (d5 < minDist) minDist = d5, Ncube = (float3)(0, 0, 1);
+        // return normal in world space
+        N = (float4)(MultiplyMatrix((float4)(Ncube, 0), cubeMatrices[cubeIdx]) , 0);
+    }
+    else 
         N = primNorms[primIdxs[rayPixelIdx]];
         
     if (dot( N, directions[rayPixelIdx] ) > 0)

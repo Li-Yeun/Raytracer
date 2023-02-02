@@ -30,7 +30,7 @@ struct GPUBVHNode
 
 __kernel void InitialExtend(__global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,   // Primary Rays
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos,
+__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float16* cubeInvMatrices, __global float4* cubeB, __global float4* primNorms, __global float4* triangleInfos,
 __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx)
 {
     int threadId = get_global_id(0);
@@ -46,7 +46,6 @@ __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx)
     // Quad intersection
     for(int i = 0; i < quads_size; i++)
     {
-        //TODO
         float3 O = MultiplyMatrix((float4)(rayO, 1), quadMatrices[i]);
         float3 D = MultiplyMatrix((float4)(rayD, 0), quadMatrices[i]);
         float t = O.y / -D.y;
@@ -62,7 +61,51 @@ __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx)
         }
     }
 
-    int planeStartIdx = quads_size + spheres_size + cubes_size;
+    int cubeStartIdx = quads_size + spheres_size;
+
+    for(int i = 0; i < cubes_size; i++)
+    {
+        int offset = i * 2;
+        float3 O = MultiplyMatrix((float4)(rayO, 1), cubeInvMatrices[i]);
+        float3 D = MultiplyMatrix((float4)(rayD, 0), cubeInvMatrices[i]);
+        float rDx = 1 / D.x, rDy = 1 / D.y, rDz = 1 / D.z;
+        int signx = D.x < 0, signy = D.y < 0, signz = D.z < 0;
+        float tmin = (cubeB[signx + offset].x - O.x) * rDx;
+        float tmax = (cubeB[1 - signx + offset].x - O.x) * rDx;
+        float tymin = (cubeB[signy + offset].y - O.y) * rDy;
+        float tymax = (cubeB[1 - signy + offset].y - O.y) * rDy;
+
+        if (tmin > tymax || tymin > tmax) 
+            continue;
+
+        tmin = max(tmin, tymin), tmax = min(tmax, tymax);
+        float tzmin = (cubeB[signz + offset].z - O.z) * rDz;
+        float tzmax = (cubeB[1 - signz + offset].z - O.z) * rDz;
+
+        if (tmin > tzmax || tzmin > tmax) 
+            continue;
+            
+        tmin = max(tmin, tzmin), tmax = min(tmax, tzmax);
+
+        if (tmin > 0)
+        {
+            if (tmin < rayT) 
+            {
+                rayT = tmin; 
+                rayObjIdx = cubeStartIdx + i;
+            }
+        }
+        else if (tmax > 0)
+        {
+            if (tmax < rayT) 
+            {
+                rayT = tmax; 
+                rayObjIdx = cubeStartIdx + i;
+            }
+        }
+    }
+
+    int planeStartIdx = cubeStartIdx + cubes_size;
     // Plane intersection
     for(int i = 0; i < planes_size; i++)
     {
@@ -77,7 +120,7 @@ __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx)
             rayObjIdx = currentPlaneIdx;
         }
     }
-        
+
     struct GPUBVHNode* node = &bvhNodes[2], *stack[32]; // *stack[64] wordt gebruik in cpu code
     uint stackPtr = 0;
     
@@ -192,7 +235,7 @@ __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx)
 __global int counter = 0;
 __kernel void Extend(__global int* pixelIdxs, __global float4* origins, __global float4* directions, __global float* distances, __global int* primIdxs,   // Primary Rays
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos,
+__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float16* cubeInvMatrices, __global float4* cubeB, __global float4* primNorms, __global float4* triangleInfos,
 __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx,
 __global int* shadowBounceCounter, __global int* bouncePixelIdxs)
 {
@@ -210,7 +253,6 @@ __global int* shadowBounceCounter, __global int* bouncePixelIdxs)
     // Quad intersection
     for(int i = 0; i < quads_size; i++)
     {
-        //TODO
         float3 O = MultiplyMatrix((float4)(rayO, 1), quadMatrices[i]);
         float3 D = MultiplyMatrix((float4)(rayD, 0), quadMatrices[i]);
         float t = O.y / -D.y;
@@ -226,7 +268,51 @@ __global int* shadowBounceCounter, __global int* bouncePixelIdxs)
         }
     }
 
-    int planeStartIdx = quads_size + spheres_size + cubes_size;
+    int cubeStartIdx = quads_size + spheres_size;
+
+    for(int i = 0; i < cubes_size; i++)
+    {
+        int offset = i * 2;
+        float3 O = MultiplyMatrix((float4)(rayO, 1), cubeInvMatrices[i]);
+        float3 D = MultiplyMatrix((float4)(rayD, 0), cubeInvMatrices[i]);
+        float rDx = 1 / D.x, rDy = 1 / D.y, rDz = 1 / D.z;
+        int signx = D.x < 0, signy = D.y < 0, signz = D.z < 0;
+        float tmin = (cubeB[signx + offset].x - O.x) * rDx;
+        float tmax = (cubeB[1 - signx + offset].x - O.x) * rDx;
+        float tymin = (cubeB[signy + offset].y - O.y) * rDy;
+        float tymax = (cubeB[1 - signy + offset].y - O.y) * rDy;
+
+        if (tmin > tymax || tymin > tmax) 
+            continue;
+
+        tmin = max(tmin, tymin), tmax = min(tmax, tymax);
+        float tzmin = (cubeB[signz + offset].z - O.z) * rDz;
+        float tzmax = (cubeB[1 - signz + offset].z - O.z) * rDz;
+
+        if (tmin > tzmax || tzmin > tmax) 
+            continue;
+            
+        tmin = max(tmin, tzmin), tmax = min(tmax, tzmax);
+
+        if (tmin > 0)
+        {
+            if (tmin < rayT) 
+            {
+                rayT = tmin; 
+                rayObjIdx = cubeStartIdx + i;
+            }
+        }
+        else if (tmax > 0)
+        {
+            if (tmax < rayT) 
+            {
+                rayT = tmax; 
+                rayObjIdx = cubeStartIdx + i;
+            }
+        }
+    }
+
+    int planeStartIdx = cubeStartIdx + cubes_size;
     // Plane intersection
     for(int i = 0; i < planes_size; i++)
     {

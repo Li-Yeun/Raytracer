@@ -99,6 +99,9 @@ public:
         quadMatrices = new mat4[quads_size];
         quadSizes = new float[quads_size];
         sphereInfos = new float4[spheres_size];
+        cubeMatrices = new mat4[cubes_size];
+        cubeInvMatrices = new mat4[cubes_size];
+        cubeBs = new float4[cubes_size * 2];
         triangleInfos = new float4[triangles_size * 3];
         // Normals
         primitives = new float4[totalPrimitives];
@@ -142,14 +145,16 @@ public:
             if (i >= lowerLimit && i < upperLimit)
             {
                 primMaterials[i] = (int) cubes[i - lowerLimit].material.type;
+                cubeInvMatrices[i - lowerLimit] = cubes[i - lowerLimit].invM;
+                cubeBs[(i - lowerLimit) * 2] = float4(cubes[i - lowerLimit].b[0], 0);
+                cubeBs[(i - lowerLimit) * 2 + 1] = float4(cubes[i - lowerLimit].b[1], 0);
 
-                // TODO CHANGE AND DELETE LATER
                 primitives[i] = float4(0);
-                albedos[i] = float4(0);
+                cubeMatrices[i - lowerLimit] = cubes[i - lowerLimit].M;
+                albedos[i] = float4(cubes[i - lowerLimit].material.color, 0);
 
-
-                refractiveIndices[i] = 0;
-                absorptions[i] = float4(0);
+                refractiveIndices[i] = cubes[i - lowerLimit].material.refractive_index;
+                absorptions[i] = float4(cubes[i - lowerLimit].material.absorption, 0);
             }
 
             lowerLimit = upperLimit;
@@ -186,6 +191,10 @@ public:
         quadMatrixBuffer = new Buffer(quads_size * sizeof(mat4), quadMatrices, CL_MEM_READ_ONLY);
         quadSizeBuffer = new Buffer(quads_size * sizeof(float), quadSizes, CL_MEM_READ_ONLY);
         sphereInfoBuffer = new Buffer(spheres_size * sizeof(float4), sphereInfos, CL_MEM_READ_ONLY);
+        cubeMatrixBuffer = new Buffer(cubes_size * sizeof(mat4), cubeMatrices, CL_MEM_READ_ONLY);
+        cubeInvMatrixBuffer = new Buffer(cubes_size * sizeof(mat4), cubeInvMatrices, CL_MEM_READ_ONLY);
+        cubeBBuffer = new Buffer(cubes_size * 2 * sizeof(float4), cubeBs, CL_MEM_READ_ONLY);
+
         triangleInfoBuffer = new Buffer(triangles_size * 3 * sizeof(float4), triangleInfos, CL_MEM_READ_ONLY);
 
         // Normals
@@ -593,12 +602,17 @@ public:
     mat4* quadMatrices;
     float* quadSizes;
     float4* sphereInfos;
-    // TODO CUBES
+    mat4* cubeMatrices;
+    mat4* cubeInvMatrices;
+    float4* cubeBs;
     float4* triangleInfos;
   
     static inline Buffer* quadMatrixBuffer;
     static inline Buffer* quadSizeBuffer;
     static inline Buffer* sphereInfoBuffer;
+    static inline Buffer* cubeMatrixBuffer;
+    static inline Buffer* cubeInvMatrixBuffer;
+    static inline Buffer* cubeBBuffer;
     static inline Buffer* triangleInfoBuffer;
     // Normals
     float4* primitives;

@@ -27,7 +27,7 @@ struct GPUBVHNode
 
 __kernel void Connect(__global int* shadowPixelIdxs, __global float4* shadowOrigins, __global float4* shadowDirections, __global float* shadowDistances,
 int quads_size, int spheres_size, int cubes_size, int planes_size, int triangles_size,
-__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float4* primNorms, __global float4* triangleInfos,
+__global float16* quadMatrices, __global float* quadSizes, __global float4* sphereInfos, __global float16* cubeInvMatrices, __global float4* cubeB, __global float4* primNorms, __global float4* triangleInfos,
 __global struct GPUBVHNode* bvhNodes, __global int* bvhPrimitiveIdx,
 __global float4* energies, __global float4* accumulator)
 {
@@ -58,7 +58,55 @@ __global float4* energies, __global float4* accumulator)
         }
     }
     
-    int planeStartIdx = quads_size + spheres_size + cubes_size;
+    int cubeStartIdx = quads_size + spheres_size;
+
+    for(int i = 0; i < cubes_size; i++)
+    {
+        if(isOccluded)
+            break;
+
+        int offset = i * 2;
+        float3 O = MultiplyMatrix((float4)(rayO, 1), cubeInvMatrices[i]);
+        float3 D = MultiplyMatrix((float4)(rayD, 0), cubeInvMatrices[i]);
+        float rDx = 1 / D.x, rDy = 1 / D.y, rDz = 1 / D.z;
+        int signx = D.x < 0, signy = D.y < 0, signz = D.z < 0;
+        float tmin = (cubeB[signx + offset].x - O.x) * rDx;
+        float tmax = (cubeB[1 - signx + offset].x - O.x) * rDx;
+        float tymin = (cubeB[signy + offset].y - O.y) * rDy;
+        float tymax = (cubeB[1 - signy + offset].y - O.y) * rDy;
+
+        if (tmin > tymax || tymin > tmax) 
+            continue;
+
+        tmin = max(tmin, tymin), tmax = min(tmax, tymax);
+        float tzmin = (cubeB[signz + offset].z - O.z) * rDz;
+        float tzmax = (cubeB[1 - signz + offset].z - O.z) * rDz;
+        
+        if (tmin > tzmax || tzmin > tmax) 
+            continue;
+            
+        tmin = max(tmin, tzmin), tmax = min(tmax, tzmax);
+
+        if (tmin > 0)
+        {
+            if (tmin < rayT) 
+            {
+                isOccluded = true;
+                break;
+            }
+        }
+        else if (tmax > 0)
+        {
+            if (tmax < rayT) 
+            {
+                isOccluded = true;
+                break;
+            }
+        }
+    }
+
+    int planeStartIdx = cubeStartIdx + cubes_size;
+
     // Plane intersection
     for(int i = 0; i < planes_size; i++)
     {
