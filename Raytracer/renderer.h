@@ -49,8 +49,11 @@ public:
 			//Clear accumulator
 			memset(accumulator, 0, SCRWIDTH * SCRHEIGHT * 16);
 
-			if(useGPU)
-				accumulatorBuffer->CopyToDevice();
+			if (useGPU)
+			{
+				accumulatorBuffer->CopyToDevice(false);
+				cameraPropBuffer->CopyToDevice(true);
+			}
 		}
 	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
@@ -66,8 +69,11 @@ public:
 		accumulatedFrames = 0;
 		//Clear accumulator
 		memset(accumulator, 0, SCRWIDTH * SCRHEIGHT * 16);
-		if(mode)
-			accumulatorBuffer->CopyToDevice();
+		if (mode)
+		{
+			accumulatorBuffer->CopyToDevice(false);
+			cameraPropBuffer->CopyToDevice(true);
+		}
 	}
 
 	//Kernels
