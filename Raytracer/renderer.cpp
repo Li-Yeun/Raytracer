@@ -11,8 +11,8 @@ void Renderer::Init()
 	memset( accumulator, 0, SCRWIDTH * SCRHEIGHT * 16 );
 
 	// Create Kernels
-	generateInitialPrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GenerateInitialPrimaryRays");
 	generatePrimaryRaysKernel = new Kernel("Kernels/generatePrimaryRays.cl", "GeneratePrimaryRays");
+	initialExtendKernel = new Kernel("Kernels/extend.cl", "InitialExtend");
 	extendKernel = new Kernel("Kernels/extend.cl", "Extend");
 	shadeKernel = new Kernel("Kernels/shade.cl", "Shade");
 	connectKernel = new Kernel("Kernels/connect.cl", "Connect");
@@ -21,12 +21,9 @@ void Renderer::Init()
 	// Create Buffers
 	deviceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), screen->pixels, CL_MEM_WRITE_ONLY);
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
-
-	// DELETE LATER
-	rayCounter = new int[1]{ SCRWIDTH * SCRHEIGHT };
+	cameraPropBuffer = new Buffer(4 * sizeof(float4), camera->gpuCamProp, 0);
 
 	// Primary Ray Buffers
-	rayCounterBuffer = new Buffer(1 * sizeof(int), rayCounter, 0);
 	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 	originBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	directionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
@@ -39,19 +36,16 @@ void Renderer::Init()
 	energyBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	transmissionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 
-	shadowCounter = new int[1]{ 0 };
+	shadowBounceCounter = new int[2]{ 0, 0 };
 
 	// Shadow Ray Buffers
-	shadowCounterBuffer = new Buffer(1 * sizeof(int), shadowCounter, 0);
+	shadowBounceCounterBuffer = new Buffer(2 * sizeof(int), shadowBounceCounter, 0);
 	shadowPixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 	shadowOriginBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	shadowDirectionBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4));
 	shadowDistanceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float));
 
-	bounceCounter = new int[1]{ 0 };
-
 	// Bounce Ray Buffers
-	bounceCounterBuffer = new Buffer(1 * sizeof(int), bounceCounter, 0);
 	bouncePixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
 
 	static uint* seeds = new uint[SCRWIDTH * SCRHEIGHT];
@@ -63,16 +57,10 @@ void Renderer::Init()
 	seedBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), seeds, 0);
 
 	// Set Kernel Arguments
-	generateInitialPrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
-	energyBuffer, transmissionBuffer);																						
+	generatePrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
+	energyBuffer, transmissionBuffer, cameraPropBuffer);																						
 
-	generatePrimaryRaysKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, // Primary Rays
-		shadowCounterBuffer,																												// Shadow Rays	
-		bounceCounterBuffer, bouncePixelIdxBuffer);											    // Bounce Rays  
-
-	rayCounterBuffer->CopyToDevice(false);
-	shadowCounterBuffer->CopyToDevice(false);
-	bounceCounterBuffer->CopyToDevice(false);
+	cameraPropBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 
@@ -375,133 +363,7 @@ float3 Renderer::Sample(Ray& ray)
 	return E;
 
 }
-/*	FULL SAMPLE CODE WITH GLASS AND MIRROR
-float3 Renderer::Sample(Ray& ray)
-{
-	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
 
-	bool lastSpecular = true;
-	float3 lastAbsorption = float3(1.0f);
-	while (1)
-	{
-		scene.FindNearest(ray);
-		if (ray.objIdx == -1) break;
-
-		Material material = scene.GetMaterial(ray.objIdx);
-		float3 intersection = ray.O + ray.t * ray.D;
-		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
-		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
-		float3 BRDF = albedo / PI;
-
-		if (material.type == Material::MaterialType::LIGHT)
-		{
-			if (lastSpecular)
-				return lastAbsorption * material.emission;
-
-			break;
-		}
-		else if (material.type == Material::MaterialType::MIRROR)
-		{
-			float3 reflect_direction = ray.D - 2 * (dot(ray.D, normal)) * normal;
-			ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
-			lastSpecular = true;
-		}
-		else if (material.type == Material::MaterialType::DIFFUSE)
-		{
-			// sample a random light source
-			std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
-
-			float A = std::get<0>(result);
-			float3 Nl = std::get<1>(result);
-			float3 light_point = std::get<2>(result);
-			float3 L = light_point - intersection;
-			float dist = magnitude(L);
-			L = normalize(L);
-
-			Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
-
-			if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
-			{
-				float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
-				float lightPDF = 1.0f / solidAngle;
-				E += T * (dot(normal, L) / lightPDF) * BRDF * lastAbsorption * std::get<3>(result);
-			}
-
-			// Russian Roulette
-			float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
-			if (p < RandomFloat()) break; else T *= 1.0f / p;
-
-			// continue random walk
-			float3 R = scene.DiffuseReflection(normal);
-			float hemiPDF = 1.0f / (PI * 2.0f);
-			ray = Ray(intersection + R * 0.001f, R);
-			T *= (dot(normal, R) / hemiPDF) * BRDF * lastAbsorption;
-
-			lastSpecular = false;
-			lastAbsorption = float3(1.0f);
-		}
-		else if (material.type == Material::MaterialType::GLASS)
-		{
-			// Compute Refraction & Absoption
-			float air_refractive_index = 1.0003f;
-			float n1, n2, refraction_ratio;
-
-			float3 absorption = float3(1.0f);
-			if (ray.inside)
-			{
-				absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z * ray.t));
-				n1 = material.refractive_index;
-				n2 = air_refractive_index;
-			}
-			else
-			{
-				n1 = air_refractive_index;
-				n2 = material.refractive_index;
-			}
-
-			refraction_ratio = n1 / n2;
-
-			float incoming_angle = dot(normal, -ray.D);
-			float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
-
-			// Compute Freshnel 
-			float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
-
-			float outcoming_angle = dot(-normal, refraction_direction);
-			double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
-			double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
-
-			float Fr = 0.5f * (leftFracture + rightFracture);
-
-			if (k < 0 || RandomFloat() <= Fr)
-			{
-				// Compute reflection
-				float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
-				ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
-				//reflectRay.inside = ray.inside;
-				lastAbsorption *= albedo * absorption;
-
-				//return albedo * absorption * Trace(reflectRay, recursion_depth + 1);
-
-			}
-			else
-			{
-				// Compute refraction
-				ray = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
-				ray.inside = !ray.inside;
-				lastAbsorption *= albedo * absorption;
-				//return albedo * absorption * Trace(refractRay, recursion_depth + 1);
-
-			}
-
-			lastSpecular = false;
-
-		}
-	}
-	return E;
-
-}
-*/
 
 void Renderer::KeyDown(int key) {
 	float velocity = .05f;
@@ -591,26 +453,38 @@ void Renderer::Tick(float deltaTime)
 	if (firstTick)
 	{
 
-		extendKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+		initialExtendKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
 		scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
-		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+		scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 		scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer);
 
 		scene.quadMatrixBuffer->CopyToDevice(false);
 		scene.quadSizeBuffer->CopyToDevice(false);
 		scene.sphereInfoBuffer->CopyToDevice(false);
+		scene.cubeInvMatrixBuffer->CopyToDevice(false);
+		scene.cubeBBuffer->CopyToDevice(false);
 		scene.primitiveBuffer->CopyToDevice(false);
 		scene.triangleInfoBuffer->CopyToDevice(false);
 		scene.bvhNodesBuffer->CopyToDevice(false);
 		scene.bvhPrimitiveIdxBuffer->CopyToDevice(false);
 
-		int planeStartIdx = scene.quads_size + scene.spheres_size + scene.cubes_size;
-		shadeKernel->SetArguments(rayCounterBuffer, pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
-			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, float4(scene.quads_size, planeStartIdx, 0, 0), float4(scene.spheres_size, scene.planes_size, 0, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
+		extendKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer,
+			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
+			shadowBounceCounterBuffer, bouncePixelIdxBuffer);
+
+		shadowBounceCounterBuffer->CopyToDevice(false);
+
+		int cubeStartIdx = scene.quads_size + scene.spheres_size;
+		int planeStartIdx = cubeStartIdx + scene.cubes_size;
+		shadeKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
+			scene.albedoBuffer, scene.primMaterialBuffer, scene.primitiveBuffer, scene.sphereInvrBuffer, scene.cubeMatrixBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, float4(scene.quads_size, planeStartIdx, cubeStartIdx, 0), float4(scene.spheres_size, scene.planes_size, scene.cubes_size, 0), scene.textureBuffer, scene.refractiveIndexBuffer, scene.absorptionBuffer,	  // Primitives
 			scene.lightBuffer, scene.quads[0].A, scene.quads[0].s, float4(scene.quads[0].material.emission, 0),							  // TODO REMOVE A CAN BE CALCULATED FROM s   // Light Source(s)
 			energyBuffer, transmissionBuffer,																					  // E & T
-			shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
-			bounceCounterBuffer, bouncePixelIdxBuffer,
+			shadowBounceCounterBuffer,
+			shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,			  // Shadow Rays
+			bouncePixelIdxBuffer,
 			accumulatorBuffer,
 			seedBuffer
 		);
@@ -621,14 +495,16 @@ void Renderer::Tick(float deltaTime)
 		scene.textureBuffer->CopyToDevice(false);
 		scene.primMaterialBuffer->CopyToDevice(false);
 
+		scene.cubeMatrixBuffer->CopyToDevice(false);
+
 		scene.refractiveIndexBuffer->CopyToDevice(false);
 		scene.absorptionBuffer->CopyToDevice(false);
 
 		scene.lightBuffer->CopyToDevice(true);
 
-		connectKernel->SetArguments(shadowCounterBuffer, shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
+		connectKernel->SetArguments(shadowPixelIdxBuffer, shadowOriginBuffer, shadowDirectionBuffer, shadowDistanceBuffer,
 			scene.quads_size, scene.spheres_size, scene.cubes_size, scene.planes_size, scene.triangles_size,
-			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
+			scene.quadMatrixBuffer, scene.quadSizeBuffer, scene.sphereInfoBuffer, scene.cubeInvMatrixBuffer, scene.cubeBBuffer, scene.primitiveBuffer, scene.triangleInfoBuffer,
 			scene.bvhNodesBuffer, scene.bvhPrimitiveIdxBuffer,
 			energyBuffer, accumulatorBuffer
 		);
@@ -647,37 +523,33 @@ void Renderer::Tick(float deltaTime)
 		{
 			accumulatedFrames += 1;
 
-			generateInitialPrimaryRaysKernel->S(9, camera->aspect);
-			generateInitialPrimaryRaysKernel->S(10, float4(camera->camPos, 0));
-			generateInitialPrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+			if (shadowBounceCounter[0] > 0)
+			{
+				shadowBounceCounter[0] = 0;
+				shadowBounceCounterBuffer->CopyToDevice(true);
+			}
 
-			// TODO DO SOMETHING SMARTER TO RESET COUNTER
-			rayCounter[0] = SCRWIDTH * SCRHEIGHT; 
-			rayCounterBuffer->CopyToDevice(true);
+			cameraPropBuffer->CopyToDevice(true);
 
-			extendKernel->Run(SCRWIDTH * SCRHEIGHT);
+			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
+
+			initialExtendKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			shadeKernel->Run(SCRWIDTH * SCRHEIGHT);
 
-			bounceCounterBuffer->CopyFromDevice(false);
-			shadowCounterBuffer->CopyFromDevice(true);
+			shadowBounceCounterBuffer->CopyFromDevice(true);
 
-			connectKernel->Run(shadowCounter[0]);
+			connectKernel->Run(shadowBounceCounter[0]);
 
-			while (bounceCounter[0] > 0)
+			while (shadowBounceCounter[1] > 0)
 			{
-				generatePrimaryRaysKernel->Run(bounceCounter[0]);
+				extendKernel->Run(shadowBounceCounter[1]);
+				
+				shadeKernel->Run(shadowBounceCounter[1]);
+				
+				shadowBounceCounterBuffer->CopyFromDevice(true);
 
-				rayCounterBuffer->CopyFromDevice(true);
-				
-				extendKernel->Run(rayCounter[0]);
-				
-				shadeKernel->Run(rayCounter[0]);
-				
-				bounceCounterBuffer->CopyFromDevice(false);
-				shadowCounterBuffer->CopyFromDevice(true);
-
-				connectKernel->Run(shadowCounter[0]);
+				connectKernel->Run(shadowBounceCounter[0]);
 			}
 
 			finalizeKernel->S(2, (int) accumulatedFrames);
@@ -747,7 +619,16 @@ void Renderer::Tick(float deltaTime)
 			}
 		}
 
-		camera->Update();
+	}
+	
+	if (camera->Update() && visualizationMode == PathTracing)
+	{
+		accumulatedFrames = 0;
+		//Clear accumulator
+		memset(accumulator, 0, SCRWIDTH* SCRHEIGHT * 16);
+
+		if (useGPU)
+			accumulatorBuffer->CopyToDevice();
 	}
 
 	// performance report - running average - ms, MRays/s

@@ -47,14 +47,10 @@ public:
 		{
 			accumulatedFrames = 0;
 			//Clear accumulator
-			#pragma omp parallel for schedule(dynamic)
-			for (int y = 0; y < SCRHEIGHT; y++)
-			{
-				// trace a primary ray for each pixel on the line
-				for (int x = 0; x < SCRWIDTH; x++)
-					accumulator[x + y * SCRWIDTH] =
-					float4(0);
-			}
+			memset(accumulator, 0, SCRWIDTH * SCRHEIGHT * 16);
+
+			if(useGPU)
+				accumulatorBuffer->CopyToDevice();
 		}
 	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
@@ -69,20 +65,14 @@ public:
 
 		accumulatedFrames = 0;
 		//Clear accumulator
-#pragma omp parallel for schedule(dynamic)
-		for (int y = 0; y < SCRHEIGHT; y++)
-		{
-			// trace a primary ray for each pixel on the line
-			for (int x = 0; x < SCRWIDTH; x++)
-				accumulator[x + y * SCRWIDTH] =
-				float4(0);
-		}
-		accumulatorBuffer->CopyToDevice();
+		memset(accumulator, 0, SCRWIDTH * SCRHEIGHT * 16);
+		if(mode)
+			accumulatorBuffer->CopyToDevice();
 	}
 
 	//Kernels
-	static inline Kernel* generateInitialPrimaryRaysKernel;
 	static inline Kernel* generatePrimaryRaysKernel;
+	static inline Kernel* initialExtendKernel;
 	static inline Kernel* extendKernel;
 	static inline Kernel* shadeKernel;
 	static inline Kernel* connectKernel;
@@ -93,11 +83,9 @@ public:
 	// Screen Buffers
 	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
-
-	int* rayCounter;
+	static inline Buffer* cameraPropBuffer;
 
 	// Ray Buffers
-	static inline Buffer* rayCounterBuffer;
 	static inline Buffer* pixelIdxBuffer;
 	static inline Buffer* originBuffer;
 	static inline Buffer* directionBuffer;
@@ -111,16 +99,14 @@ public:
 	static inline Buffer* energyBuffer;
 	static inline Buffer* transmissionBuffer;
 
-	int* shadowCounter;
+	int* shadowBounceCounter;
 
+	static inline Buffer* shadowBounceCounterBuffer;
 	// Shadow Ray Buffers
-	static inline Buffer* shadowCounterBuffer;
 	static inline Buffer* shadowPixelIdxBuffer;
 	static inline Buffer* shadowOriginBuffer;
 	static inline Buffer* shadowDirectionBuffer;
 	static inline Buffer* shadowDistanceBuffer;
-
-	int* bounceCounter;
 
 	// Bounce Ray Buffers
 	static inline Buffer* bounceCounterBuffer;
