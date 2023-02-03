@@ -529,8 +529,6 @@ void Renderer::Tick(float deltaTime)
 				shadowBounceCounterBuffer->CopyToDevice(true);
 			}
 
-			cameraPropBuffer->CopyToDevice(true);
-
 			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			initialExtendKernel->Run(SCRWIDTH * SCRHEIGHT);
@@ -628,7 +626,10 @@ void Renderer::Tick(float deltaTime)
 		memset(accumulator, 0, SCRWIDTH* SCRHEIGHT * 16);
 
 		if (useGPU)
-			accumulatorBuffer->CopyToDevice();
+		{
+			accumulatorBuffer->CopyToDevice(false);
+			cameraPropBuffer->CopyToDevice(true);
+		}
 	}
 
 	// performance report - running average - ms, MRays/s
