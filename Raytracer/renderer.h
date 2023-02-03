@@ -47,14 +47,10 @@ public:
 		{
 			accumulatedFrames = 0;
 			//Clear accumulator
-			#pragma omp parallel for schedule(dynamic)
-			for (int y = 0; y < SCRHEIGHT; y++)
-			{
-				// trace a primary ray for each pixel on the line
-				for (int x = 0; x < SCRWIDTH; x++)
-					accumulator[x + y * SCRWIDTH] =
-					float4(0);
-			}
+			memset(accumulator, 0, SCRWIDTH * SCRHEIGHT * 16);
+
+			if(useGPU)
+				accumulatorBuffer->CopyToDevice();
 		}
 	}
 	void SetRecusionDepth(int newDepth) { recursionDepth = newDepth; }
@@ -69,15 +65,9 @@ public:
 
 		accumulatedFrames = 0;
 		//Clear accumulator
-#pragma omp parallel for schedule(dynamic)
-		for (int y = 0; y < SCRHEIGHT; y++)
-		{
-			// trace a primary ray for each pixel on the line
-			for (int x = 0; x < SCRWIDTH; x++)
-				accumulator[x + y * SCRWIDTH] =
-				float4(0);
-		}
-		accumulatorBuffer->CopyToDevice();
+		memset(accumulator, 0, SCRWIDTH * SCRHEIGHT * 16);
+		if(mode)
+			accumulatorBuffer->CopyToDevice();
 	}
 
 	//Kernels
@@ -93,6 +83,7 @@ public:
 	// Screen Buffers
 	static inline Buffer* deviceBuffer; // Buffer that stores and display the final pixel values
 	static inline Buffer* accumulatorBuffer;
+	static inline Buffer* cameraPropBuffer;
 
 	// Ray Buffers
 	static inline Buffer* pixelIdxBuffer;

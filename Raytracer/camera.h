@@ -21,6 +21,8 @@ public:
 		topLeft = float3( -aspect, 1, 0 );
 		topRight = float3( aspect, 1, 0 );
 		bottomLeft = float3( -aspect, -1, 0 );
+
+		gpuCamProp = new float4[4]{ float4(camPos, 0) , float4(topLeft, 0), float4(topRight, 0), float4(bottomLeft, 0) };
 	}
 
 	Ray GetPrimaryRay( const int x, const int y )
@@ -44,6 +46,8 @@ public:
 	float aspect = (float)SCRWIDTH / (float)SCRHEIGHT;
 	float3 camPos;
 	float3 topLeft, topRight, bottomLeft;
+
+	float4* gpuCamProp;
 
 	void Translate(float3 translate, int direction)
 	{
@@ -88,7 +92,7 @@ public:
 	}
 
 
-	void Update()
+	bool Update()
 	{
 		float3 rotation = float3(0);
 		float3 horizontalDirection = normalize(topLeft - bottomLeft);
@@ -118,6 +122,15 @@ public:
 			bottomLeft += translation;
 		}
 
+		gpuCamProp[0] = float4(camPos, 0);
+		gpuCamProp[1] = float4(topLeft, 0);
+		gpuCamProp[2] = float4(topRight, 0);
+		gpuCamProp[3] = float4(bottomLeft, 0);
+
+		if (magnitude(translation) != 0 || magnitude(rotation) != 0)
+			return true;
+		
+		return false;
 	}
 
 	void SetFov(int fov)

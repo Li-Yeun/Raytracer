@@ -21,6 +21,7 @@ void Renderer::Init()
 	// Create Buffers
 	deviceBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(uint), screen->pixels, CL_MEM_WRITE_ONLY);
 	accumulatorBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(float4), accumulator, 0);
+	cameraPropBuffer = new Buffer(4 * sizeof(float4), camera->gpuCamProp, 0);
 
 	// Primary Ray Buffers
 	pixelIdxBuffer = new Buffer(SCRWIDTH * SCRHEIGHT * sizeof(int));
@@ -57,7 +58,9 @@ void Renderer::Init()
 
 	// Set Kernel Arguments
 	generatePrimaryRaysKernel->SetArguments(pixelIdxBuffer, originBuffer, directionBuffer, distanceBuffer, primIdxBuffer, lastSpecularBuffer, insideBuffer, // Primary Rays
-	energyBuffer, transmissionBuffer);																						
+	energyBuffer, transmissionBuffer, cameraPropBuffer);																						
+
+	cameraPropBuffer->CopyToDevice(false);
 
 	finalizeKernel->SetArguments(deviceBuffer, accumulatorBuffer);
 
@@ -360,133 +363,7 @@ float3 Renderer::Sample(Ray& ray)
 	return E;
 
 }
-/*	FULL SAMPLE CODE WITH GLASS AND MIRROR
-float3 Renderer::Sample(Ray& ray)
-{
-	float3 T = float3(1.0f, 1.0f, 1.0f), E = (0.0f, 0.0f, 0.0f);
 
-	bool lastSpecular = true;
-	float3 lastAbsorption = float3(1.0f);
-	while (1)
-	{
-		scene.FindNearest(ray);
-		if (ray.objIdx == -1) break;
-
-		Material material = scene.GetMaterial(ray.objIdx);
-		float3 intersection = ray.O + ray.t * ray.D;
-		float3 normal = scene.GetNormal(ray.objIdx, intersection, ray.D);
-		float3 albedo = scene.GetAlbedo(ray.objIdx, intersection, material);
-		float3 BRDF = albedo / PI;
-
-		if (material.type == Material::MaterialType::LIGHT)
-		{
-			if (lastSpecular)
-				return lastAbsorption * material.emission;
-
-			break;
-		}
-		else if (material.type == Material::MaterialType::MIRROR)
-		{
-			float3 reflect_direction = ray.D - 2 * (dot(ray.D, normal)) * normal;
-			ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
-			lastSpecular = true;
-		}
-		else if (material.type == Material::MaterialType::DIFFUSE)
-		{
-			// sample a random light source
-			std::tuple<float, float3, float3, float3> result = scene.RandomPointOnLight();
-
-			float A = std::get<0>(result);
-			float3 Nl = std::get<1>(result);
-			float3 light_point = std::get<2>(result);
-			float3 L = light_point - intersection;
-			float dist = magnitude(L);
-			L = normalize(L);
-
-			Ray lr = Ray(intersection + L * 0.001f, L, dist - 2.0f * 0.001f);
-
-			if (dot(normal, L) > 0 && dot(Nl, -L) > 0 && !scene.IsOccluded(lr))
-			{
-				float solidAngle = (dot(Nl, -L) * A) / sqrf(dist);
-				float lightPDF = 1.0f / solidAngle;
-				E += T * (dot(normal, L) / lightPDF) * BRDF * lastAbsorption * std::get<3>(result);
-			}
-
-			// Russian Roulette
-			float p = clamp(max(albedo.z, max(albedo.x, albedo.y)), 0.0f, 1.0f);
-			if (p < RandomFloat()) break; else T *= 1.0f / p;
-
-			// continue random walk
-			float3 R = scene.DiffuseReflection(normal);
-			float hemiPDF = 1.0f / (PI * 2.0f);
-			ray = Ray(intersection + R * 0.001f, R);
-			T *= (dot(normal, R) / hemiPDF) * BRDF * lastAbsorption;
-
-			lastSpecular = false;
-			lastAbsorption = float3(1.0f);
-		}
-		else if (material.type == Material::MaterialType::GLASS)
-		{
-			// Compute Refraction & Absoption
-			float air_refractive_index = 1.0003f;
-			float n1, n2, refraction_ratio;
-
-			float3 absorption = float3(1.0f);
-			if (ray.inside)
-			{
-				absorption = float3(exp(-material.absorption.x * ray.t), exp(-material.absorption.y * ray.t), exp(-material.absorption.z * ray.t));
-				n1 = material.refractive_index;
-				n2 = air_refractive_index;
-			}
-			else
-			{
-				n1 = air_refractive_index;
-				n2 = material.refractive_index;
-			}
-
-			refraction_ratio = n1 / n2;
-
-			float incoming_angle = dot(normal, -ray.D);
-			float k = 1.0f - sqrf(refraction_ratio) * (1.0f - sqrf(incoming_angle));
-
-			// Compute Freshnel 
-			float3 refraction_direction = refraction_ratio * ray.D + normal * (refraction_ratio * incoming_angle - sqrt(k));
-
-			float outcoming_angle = dot(-normal, refraction_direction);
-			double leftFracture = sqrf((n1 * incoming_angle - material.refractive_index * outcoming_angle) / (n1 * incoming_angle + n2 * outcoming_angle));
-			double rightFracture = sqrf((n1 * outcoming_angle - material.refractive_index * incoming_angle) / (n1 * outcoming_angle + n2 * incoming_angle));
-
-			float Fr = 0.5f * (leftFracture + rightFracture);
-
-			if (k < 0 || RandomFloat() <= Fr)
-			{
-				// Compute reflection
-				float3 reflect_direction = ray.D - 2.0f * (dot(ray.D, normal)) * normal;
-				ray = Ray(intersection + reflect_direction * 0.001f, reflect_direction);
-				//reflectRay.inside = ray.inside;
-				lastAbsorption *= albedo * absorption;
-
-				//return albedo * absorption * Trace(reflectRay, recursion_depth + 1);
-
-			}
-			else
-			{
-				// Compute refraction
-				ray = Ray(intersection + refraction_direction * 0.001f, refraction_direction);
-				ray.inside = !ray.inside;
-				lastAbsorption *= albedo * absorption;
-				//return albedo * absorption * Trace(refractRay, recursion_depth + 1);
-
-			}
-
-			lastSpecular = false;
-
-		}
-	}
-	return E;
-
-}
-*/
 
 void Renderer::KeyDown(int key) {
 	float velocity = .05f;
@@ -651,8 +528,9 @@ void Renderer::Tick(float deltaTime)
 				shadowBounceCounter[0] = 0;
 				shadowBounceCounterBuffer->CopyToDevice(true);
 			}
-			generatePrimaryRaysKernel->S(9, camera->aspect);
-			generatePrimaryRaysKernel->S(10, float4(camera->camPos, 0));
+
+			cameraPropBuffer->CopyToDevice(true);
+
 			generatePrimaryRaysKernel->Run(SCRWIDTH * SCRHEIGHT);
 
 			initialExtendKernel->Run(SCRWIDTH * SCRHEIGHT);
@@ -741,7 +619,16 @@ void Renderer::Tick(float deltaTime)
 			}
 		}
 
-		camera->Update();
+	}
+	
+	if (camera->Update() && visualizationMode == PathTracing)
+	{
+		accumulatedFrames = 0;
+		//Clear accumulator
+		memset(accumulator, 0, SCRWIDTH* SCRHEIGHT * 16);
+
+		if (useGPU)
+			accumulatorBuffer->CopyToDevice();
 	}
 
 	// performance report - running average - ms, MRays/s
