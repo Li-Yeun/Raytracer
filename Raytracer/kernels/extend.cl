@@ -1,4 +1,5 @@
 // int primMats;    // DIFFUSE = 0, MIRROR = 1, GLASS = 2, SUBSTANCE = 1, LIGHT = 0 
+int MAX_DEPTH = 100;
 
 // Multiply a 4x4 matrix by a 4x1 vector and convert it to a 3x1 vector
 float3 MultiplyMatrix(float4 b, float16 a)
@@ -333,9 +334,10 @@ __global int* shadowBounceCounter, __global int* bouncePixelIdxs)
     
     int triangleIdxOffset = quads_size + cubes_size + planes_size;
 
-    while (1)
+    int depth = 0;
+    while (depth < MAX_DEPTH)
     {
-        // if(threadId == 1) printf("start while\n");
+        depth++;
         if (node->primitiveCount > 0) // isLeaf()
         {
             for (uint i = 0; i < node->primitiveCount; i++)
