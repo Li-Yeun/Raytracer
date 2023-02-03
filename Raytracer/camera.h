@@ -127,6 +127,12 @@ public:
 		gpuCamProp[2] = float4(topRight, 0);
 		gpuCamProp[3] = float4(bottomLeft, 0);
 
+		if (magnitude(translation) < 0.01f)
+			translation = float3(0);
+
+		if (magnitude(rotation) < 0.01f)
+			rotation = float3(0);
+
 		if (magnitude(translation) != 0 || magnitude(rotation) != 0)
 			return true;
 		
